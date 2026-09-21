@@ -15,6 +15,12 @@
 #   sbatch --array=0-479%60  cluster/cv_array.sbatch grid       # the overnight sweep
 set -euo pipefail
 CAMPAIGN="${1:-seeds}"
+
+# Work from wherever sbatch was invoked rather than a hardcoded path, so the
+# clone can live anywhere (it is under ~/03_2026_PRC_Challenge/2026-PRC-Challenge
+# on copperhead, not ~/prc2026).
+REPO="${SLURM_SUBMIT_DIR:-$PWD}"
+cd "$REPO"
 mkdir -p logs
 
 source "$HOME/miniconda3/etc/profile.d/conda.sh" 2>/dev/null \
@@ -46,7 +52,6 @@ case "$CAMPAIGN" in
   *) echo "unknown campaign: $CAMPAIGN" >&2; exit 1 ;;
 esac
 
-cd "$HOME/prc2026"
 srun python cluster/cv_task.py --campaign "$CAMPAIGN" --config "$CONFIG" \
      --clf-config "$CLF" --seed "$SEED" --month "$MONTH" \
      --threads "$SLURM_CPUS_PER_TASK"

@@ -37,12 +37,15 @@ Environment, once, on the cluster: `bash cluster/setup_env.sh`.
 Code travels by git; **data does not and must not**.
 
     # once, on copperhead
-    git clone git@github.com:alexl4123/2026-PRC-Challenge.git ~/prc2026
+    git clone git@github.com:alexl4123/2026-PRC-Challenge.git \
+        ~/03_2026_PRC_Challenge/2026-PRC-Challenge
 
     # thereafter
-    ssh vivaldi 'cd ~/prc2026 && git pull'
+    ssh vivaldi 'cd ~/03_2026_PRC_Challenge/2026-PRC-Challenge && git pull'
 
-`cluster/sync.sh` remains for the data only.
+`cluster/sync.sh` remains for the data only. It takes the remote host and
+remote path as arguments, defaulting to `vivaldi` and
+`03_2026_PRC_Challenge/2026-PRC-Challenge`.
 
 ## Getting the DATA there
 
@@ -53,13 +56,13 @@ Two options:
 1. **Copy the local cache** (~264 MB, one off):
 
        rsync -az cache/training.parquet cache/ranking.parquet \
-             cache/external/ vivaldi:~/prc2026/cache/
+             cache/external/ vivaldi:~/03_2026_PRC_Challenge/2026-PRC-Challenge/cache/
 
    Without `~/.ssh/config`, pass the key explicitly:
 
        rsync -az -e 'ssh -i ~/.keyfiles/copperhead.key' \
              cache/training.parquet cache/ranking.parquet cache/external/ \
-             abeiser@vivaldi.kr.tuwien.ac.at:~/prc2026/cache/
+             abeiser@vivaldi.kr.tuwien.ac.at:~/03_2026_PRC_Challenge/2026-PRC-Challenge/cache/
 
 2. **Fetch from the OSN bucket on the cluster**, using the team's own S3
    credentials placed at `~/.config/prc2026/s3.env` on copperhead (mode 600).
@@ -69,11 +72,11 @@ Either way the data stays inside the user's own cluster home directory.
 
 ## Usage
 
-    ssh vivaldi 'cd ~/prc2026 && git pull'
-    ssh vivaldi 'cd ~/prc2026 && bash cluster/preflight.sh'
-    ssh vivaldi 'cd ~/prc2026 && sbatch --array=0-479%60 cluster/cv_array.sbatch grid'
+    ssh vivaldi 'cd ~/03_2026_PRC_Challenge/2026-PRC-Challenge && git pull'
+    ssh vivaldi 'cd ~/03_2026_PRC_Challenge/2026-PRC-Challenge && bash cluster/preflight.sh'
+    ssh vivaldi 'cd ~/03_2026_PRC_Challenge/2026-PRC-Challenge && sbatch --array=0-479%60 cluster/cv_array.sbatch grid'
     ssh vivaldi 'squeue -u $USER'
-    ssh vivaldi 'cd ~/prc2026 && conda activate prc2026 && python cluster/collect.py grid'
+    ssh vivaldi 'cd ~/03_2026_PRC_Challenge/2026-PRC-Challenge && conda activate prc2026 && python cluster/collect.py grid'
 
 The user runs these; the output is pasted back for analysis.
 
