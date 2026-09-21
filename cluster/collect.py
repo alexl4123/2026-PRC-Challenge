@@ -25,10 +25,15 @@ def main(campaign):
     y = tr[TARGET].astype(float).to_numpy()
     month = tr.MVT_TIME_UTC_mvt.dt.month.to_numpy()
 
+    # Filenames are r-<regconfig>__c-<clfconfig>__seedNN__mMM.npy (the grid
+    # campaign) or <config>__seedNN__mMM.npy (the older campaigns).
     parts = defaultdict(dict)
     for f in files:
-        cfg, seed, m = f.stem.split('__')
-        parts[(cfg, seed)][int(m[1:])] = np.load(f)
+        bits = f.stem.split('__')
+        month = int(bits[-1][1:])
+        seed = bits[-2]
+        arm = '__'.join(bits[:-2])
+        parts[(arm, seed)][month] = np.load(f)
 
     oof = {}
     for (cfg, seed), bym in sorted(parts.items()):
@@ -43,16 +48,21 @@ def main(campaign):
 
     print(f'\n{len(oof)} complete OOF sets from {len(files)} task outputs\n')
     rows = []
-    for (cfg, seed), p in oof.items():
+    for (arm, seed), p in oof.items():
         s = decompose(y, p)
-        rows.append(dict(config=cfg, seed=seed, rmse=s['rmse'],
+        rows.append(dict(arm=arm, seed=seed, rmse=s['rmse'],
                          bulk=s['rmse_bulk'], tail=s['rmse_tail']))
-    print(pd.DataFrame(rows).round(2).to_string(index=False))
+    df = pd.DataFrame(rows)
+    print('--- per (arm, seed) ---')
+    print(df.round(2).to_string(index=False))
+    print('\n--- per arm, averaged over seeds (single-model RMSE, not an ensemble) ---')
+    print(df.groupby('arm')[['rmse', 'bulk', 'tail']].agg(['mean', 'std', 'min'])
+          .round(2).to_string())
 
     # Seed averaging: the 2024 winner gained 3.2% from this alone.
     by_cfg = defaultdict(list)
-    for (cfg, seed), p in oof.items():
-        by_cfg[cfg].append(p)
+    for (arm, seed), p in oof.items():
+        by_cfg[arm].append(p)
     print()
     for cfg, ps in by_cfg.items():
         if len(ps) < 2:
@@ -69,6 +79,17 @@ def main(campaign):
         print(f'    all-seed average vs seed 0: {r["diff"]:+.2f} +- {r["sd"]:.2f}  '
               f'CI [{r["lo"]:+.1f}, {r["hi"]:+.1f}]')
         print(per_month(y, best, month).round(1).to_string(index=False))
+
+    # The comparison the grid exists to make: best arm vs the current baseline.
+    if len(by_cfg) > 1:
+        print('\n--- paired comparison between arms (seed-averaged) ---')
+        avg = {k: np.mean(v, axis=0) for k, v in by_cfg.items()}
+        ranked = sorted(avg, key=lambda k: decompose(y, avg[k])['rmse'])
+        base = ranked[-1]
+        for k in ranked[:-1]:
+            r = paired_bootstrap(y, avg[k], avg[base])
+            print(f'  {k:24s} vs {base:24s}: {r["diff"]:+7.2f} +- {r["sd"]:5.2f}  '
+                  f'CI [{r["lo"]:+6.1f}, {r["hi"]:+6.1f}]  P(worse)={r["p_a_worse"]*100:.1f}%')
 
 
 if __name__ == '__main__':

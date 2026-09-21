@@ -10,8 +10,9 @@
 # One array task = one (config, seed, month) triple.
 # Timeout-bounded at 25 min per task, per the admin guidance against long jobs.
 #
-#   sbatch cluster/cv_array.sbatch seeds     # 20 seeds x 12 months, config=full
-#   sbatch --array=0-47 cluster/cv_array.sbatch ablation
+#   sbatch --array=0-239%40 cluster/cv_array.sbatch seeds      # 20 seeds x 12 months
+#   sbatch --array=0-47%40   cluster/cv_array.sbatch ablation   # 4 configs x 12 months
+#   sbatch --array=0-479%60  cluster/cv_array.sbatch grid       # the overnight sweep
 set -euo pipefail
 CAMPAIGN="${1:-seeds}"
 mkdir -p logs
@@ -28,10 +29,24 @@ case "$CAMPAIGN" in
   ablation)
       # 4 configs x 12 months, seed 0
       CONFIGS=(base cong wx full)
-      CONFIG=${CONFIGS[$(( i / 12 ))]}; SEED=0; MONTH=$(( i % 12 + 1 )) ;;
+      CONFIG=${CONFIGS[$(( i / 12 ))]}; SEED=0; MONTH=$(( i % 12 + 1 )); CLF=$CONFIG ;;
+  grid)
+      # The overnight campaign. Crosses three open questions at once:
+      #   regressor feature set   {cong, full}          2
+      #   classifier feature set  {base, cong}          2
+      #   seed                    0..9                 10
+      #   month                   1..12                12
+      # = 480 tasks. Answers, in one sweep: does a rich regressor with a lean
+      # classifier beat matched feature sets (EXP15/EXP16); how much does seed
+      # averaging buy; and which combination is best per month.
+      REGS=(cong full); CLFS=(base cong)
+      MONTH=$(( i % 12 + 1 )); r=$(( i / 12 ))
+      SEED=$(( r % 10 )); r=$(( r / 10 ))
+      CLF=${CLFS[$(( r % 2 ))]}; CONFIG=${REGS[$(( r / 2 ))]} ;;
   *) echo "unknown campaign: $CAMPAIGN" >&2; exit 1 ;;
 esac
 
 cd "$HOME/prc2026"
 srun python cluster/cv_task.py --campaign "$CAMPAIGN" --config "$CONFIG" \
-     --seed "$SEED" --month "$MONTH" --threads "$SLURM_CPUS_PER_TASK"
+     --clf-config "$CLF" --seed "$SEED" --month "$MONTH" \
+     --threads "$SLURM_CPUS_PER_TASK"

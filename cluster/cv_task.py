@@ -60,11 +60,19 @@ CONFIGS = {
     'full':  ['base', 'cong', 'wx', 'atfm'],
 }
 
+# EXP15 found the rich feature set helps the BULK regressor (July bulk -8.0s)
+# but hurts the TAIL classifier, which learns from only 435 positives in 1.74M
+# rows and gets noisier with 28 extra mostly-irrelevant columns. So the two
+# components are configured independently.
+
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--campaign', required=True)
-    ap.add_argument('--config', default='full', choices=sorted(CONFIGS))
+    ap.add_argument('--config', default='full', choices=sorted(CONFIGS),
+                    help='feature set for the BULK REGRESSOR')
+    ap.add_argument('--clf-config', default=None, choices=sorted(CONFIGS),
+                    help='feature set for the TAIL CLASSIFIER; defaults to --config')
     ap.add_argument('--seed', type=int, default=0)
     ap.add_argument('--month', type=int, required=True)
     ap.add_argument('--threads', type=int, default=int(os.environ.get('SLURM_CPUS_PER_TASK', 8)))
@@ -72,7 +80,8 @@ def main():
 
     outdir = CACHE / 'cv' / a.campaign
     outdir.mkdir(parents=True, exist_ok=True)
-    out = outdir / f'{a.config}__seed{a.seed:02d}__m{a.month:02d}.npy'
+    clf_cfg = a.clf_config or a.config
+    out = outdir / f'r-{a.config}__c-{clf_cfg}__seed{a.seed:02d}__m{a.month:02d}.npy'
     if out.exists():
         print(f'{out.name} exists, skipping')
         return
@@ -80,7 +89,9 @@ def main():
     t0 = time.time()
     X, y, month, groups = assemble()
     cols = [c for g in CONFIGS[a.config] for c in groups[g]]
+    clf_cols = [c for g in CONFIGS[clf_cfg] for c in groups[g]]
     cats = [c for c in CATS if c in cols]
+    clf_cats = [c for c in CATS if c in clf_cols]
     va = month == a.month
     tr_ = ~va
 
@@ -98,11 +109,11 @@ def main():
     k = yt <= TAIL_CAP
     mb = lgb.train(reg, lgb.Dataset(X.loc[tr_, cols][k], yt[k], categorical_feature=cats),
                    num_boost_round=350)
-    mc = lgb.train(clf, lgb.Dataset(X.loc[tr_, cols], (yt > TAIL_CAP).astype(int),
-                                    categorical_feature=cats), num_boost_round=300)
+    mc = lgb.train(clf, lgb.Dataset(X.loc[tr_, clf_cols], (yt > TAIL_CAP).astype(int),
+                                    categorical_feature=clf_cats), num_boost_round=300)
     Xv = X.loc[va, cols]
     pb = np.clip(mb.predict(Xv), 0, None)
-    pt = mc.predict(Xv)
+    pt = mc.predict(X.loc[va, clf_cols])
     osv = Xv['off_sched'].to_numpy()
     et = np.where(np.isfinite(osv) & (osv > TAIL_CAP), osv, yt[yt > TAIL_CAP].mean())
     pred = np.clip(pt * et + (1 - pt) * pb, 0, None)
