@@ -2,6 +2,8 @@
 
 Team **understanding-accordion**.
 
+Repository: <https://github.com/alexl4123/2026-PRC-Challenge>
+
 Predicting taxi-out time (seconds) for departures at ten major European
 airports — EDDF, EDDM, EGLL, EHAM, LEBL, LEMD, LFPG, LIRF, LSZH, LTFM — scored
 by RMSE over 344,841 departures in January and July 2026.

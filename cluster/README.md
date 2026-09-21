@@ -39,7 +39,7 @@ Each individual fit is ~55 s and needs ~5 GB, so the natural unit of work is one
 Code travels by git; **data does not and must not**.
 
     # once, on copperhead
-    git clone git@github.com:<you>/prc2026.git ~/prc2026
+    git clone git@github.com:alexl4123/2026-PRC-Challenge.git ~/prc2026
 
     # thereafter
     ssh copperhead 'cd ~/prc2026 && git pull'
