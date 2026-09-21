@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run ON the cluster, from ~/prc2026, BEFORE submitting any array.
+# Run ON the cluster, from the repository root, BEFORE submitting any array.
 # Checks every prerequisite an array task needs. Exits non-zero on the first
 # real problem, so a missing file costs five seconds instead of 480 failed tasks.
 set -uo pipefail

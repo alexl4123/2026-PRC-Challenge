@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Push code and the cached parquet to the cluster. Read-only on the remote side
-# apart from ~/prc2026. Never syncs outputs/ or any credential.
+# apart from the remote repo path. Never syncs outputs/ or any credential.
 set -euo pipefail
 REMOTE="${1:-vivaldi}"        # see cluster/README.md for the ~/.ssh/config stanza
 RPATH="${2:-03_2026_PRC_Challenge/2026-PRC-Challenge}"   # path on the remote, relative to $HOME
