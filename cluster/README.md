@@ -34,15 +34,52 @@ Each individual fit is ~55 s and needs ~5 GB, so the natural unit of work is one
 
 2. **Environment on the cluster**: `bash cluster/setup_env.sh` (run on copperhead).
 
+## Getting the code there: git, not rsync
+
+Code travels by git; **data does not and must not**.
+
+    # once, on copperhead
+    git clone git@github.com:<you>/prc2026.git ~/prc2026
+
+    # thereafter
+    ssh copperhead 'cd ~/prc2026 && git pull'
+
+`cluster/sync.sh` remains for the data only.
+
+## Getting the DATA there
+
+The parquets cannot go through git — the repository is destined to be public
+under GPLv3 and the challenge Terms & Conditions forbid publishing the dataset.
+Two options:
+
+1. **Copy the local cache** (~264 MB, one off):
+
+       rsync -az cache/training.parquet cache/ranking.parquet \
+             cache/external/ copperhead:~/prc2026/cache/
+
+2. **Fetch from the OSN bucket on the cluster**, using the team's own S3
+   credentials placed at `~/.config/prc2026/s3.env` on copperhead (mode 600).
+   Cleaner, since nothing large crosses the laptop's uplink twice.
+
+Either way the data stays inside the user's own cluster home directory.
+
 ## Usage
 
-    ./cluster/sync.sh                 # push code + cached parquet to the cluster
+    ssh copperhead 'cd ~/prc2026 && git pull'
     ssh copperhead 'cd ~/prc2026 && sbatch cluster/cv_array.sbatch seeds'
-    ssh copperhead 'cd ~/prc2026 && python cluster/collect.py seeds'
+    ssh copperhead 'squeue -u $USER'
+    ssh copperhead 'cd ~/prc2026 && conda activate prc2026 && python cluster/collect.py seeds'
 
-## Data handling
+The user runs these; the output is pasted back for analysis.
 
-The challenge parquets must NOT be published (T&C forbid use outside the
-competition until the organizers release them). They are copied to the cluster
-under the user's own home directory and nowhere else. `sync.sh` never touches
-`outputs/` or the credentials file.
+## What a healthy run looks like
+
+* `sbatch` prints `Submitted batch job <id>`.
+* `squeue` shows tasks in `PD` then `R`; a 240-task array with `%40` throttling
+  runs ~40 at a time.
+* Each task prints one line, e.g.
+  `full__seed03__m07.npy: n=190,713 RMSE 419.00  (55s)`, and writes one `.npy`.
+* `collect.py` refuses to score an incomplete OOF set and names the missing
+  months, so a partially failed array is obvious rather than silently wrong.
+* Tasks are idempotent: an existing `.npy` is skipped, so a failed array can be
+  resubmitted without redoing finished work.
