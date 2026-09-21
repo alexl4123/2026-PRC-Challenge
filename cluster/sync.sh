@@ -2,7 +2,7 @@
 # Push code and the cached parquet to the cluster. Read-only on the remote side
 # apart from ~/prc2026. Never syncs outputs/ or any credential.
 set -euo pipefail
-REMOTE="${1:-copperhead}"
+REMOTE="${1:-vivaldi}"   # see cluster/README.md for the ~/.ssh/config stanza
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 
 echo "syncing code -> $REMOTE:~/prc2026"

@@ -15,24 +15,22 @@ Each individual fit is ~55 s and needs ~5 GB, so the natural unit of work is one
 (config, seed, fold) triple. That also matches the local admin guidance in
 `cluster_hardware.txt`: many small timeout-bounded tasks, not one long job.
 
-## Prerequisites (one-off, by the user)
+## Access
 
-1. **SSH access.** `ssh -o BatchMode=yes abeiser@vivaldi.kr.tuwien.ac.at` currently
-   returns `Permission denied (publickey)`. Authorise the local key:
+The cluster is reached as `abeiser@vivaldi.kr.tuwien.ac.at` using a dedicated
+key at `~/.keyfiles/copperhead.key`. Adding this to `~/.ssh/config` means the
+key never has to be passed explicitly, and rsync/scp pick it up too:
 
-       ssh-copy-id -i ~/.ssh/id_ed25519.pub abeiser@vivaldi.kr.tuwien.ac.at
+    Host vivaldi
+        HostName vivaldi.kr.tuwien.ac.at
+        User abeiser
+        IdentityFile ~/.keyfiles/copperhead.key
+        IdentitiesOnly yes
 
-   Then add to `~/.ssh/config` so `copperhead` is reachable in one hop:
+The key must be mode 600 or ssh refuses to use it (`chmod 600
+~/.keyfiles/copperhead.key`).
 
-       Host vivaldi
-           HostName vivaldi.kr.tuwien.ac.at
-           User abeiser
-       Host copperhead
-           HostName copperhead
-           User abeiser
-           ProxyJump vivaldi
-
-2. **Environment on the cluster**: `bash cluster/setup_env.sh` (run on copperhead).
+Environment, once, on the cluster: `bash cluster/setup_env.sh`.
 
 ## Getting the code there: git, not rsync
 
@@ -42,7 +40,7 @@ Code travels by git; **data does not and must not**.
     git clone git@github.com:alexl4123/2026-PRC-Challenge.git ~/prc2026
 
     # thereafter
-    ssh copperhead 'cd ~/prc2026 && git pull'
+    ssh vivaldi 'cd ~/prc2026 && git pull'
 
 `cluster/sync.sh` remains for the data only.
 
@@ -55,7 +53,13 @@ Two options:
 1. **Copy the local cache** (~264 MB, one off):
 
        rsync -az cache/training.parquet cache/ranking.parquet \
-             cache/external/ copperhead:~/prc2026/cache/
+             cache/external/ vivaldi:~/prc2026/cache/
+
+   Without `~/.ssh/config`, pass the key explicitly:
+
+       rsync -az -e 'ssh -i ~/.keyfiles/copperhead.key' \
+             cache/training.parquet cache/ranking.parquet cache/external/ \
+             abeiser@vivaldi.kr.tuwien.ac.at:~/prc2026/cache/
 
 2. **Fetch from the OSN bucket on the cluster**, using the team's own S3
    credentials placed at `~/.config/prc2026/s3.env` on copperhead (mode 600).
@@ -65,10 +69,11 @@ Either way the data stays inside the user's own cluster home directory.
 
 ## Usage
 
-    ssh copperhead 'cd ~/prc2026 && git pull'
-    ssh copperhead 'cd ~/prc2026 && sbatch cluster/cv_array.sbatch seeds'
-    ssh copperhead 'squeue -u $USER'
-    ssh copperhead 'cd ~/prc2026 && conda activate prc2026 && python cluster/collect.py seeds'
+    ssh vivaldi 'cd ~/prc2026 && git pull'
+    ssh vivaldi 'cd ~/prc2026 && bash cluster/preflight.sh'
+    ssh vivaldi 'cd ~/prc2026 && sbatch --array=0-479%60 cluster/cv_array.sbatch grid'
+    ssh vivaldi 'squeue -u $USER'
+    ssh vivaldi 'cd ~/prc2026 && conda activate prc2026 && python cluster/collect.py grid'
 
 The user runs these; the output is pasted back for analysis.
 
