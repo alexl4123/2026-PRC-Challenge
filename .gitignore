@@ -1,0 +1,29 @@
+# --- data: MUST NEVER BE COMMITTED -------------------------------------------
+# The challenge Terms & Conditions forbid using or publishing the 2026 dataset
+# outside the competition until the organizers release it, and this repo becomes
+# PUBLIC under GPLv3 for prize eligibility. The raw parquets live one directory
+# ABOVE the repo root so git cannot reach them at all; these rules cover
+# everything derived from them.
+cache/
+outputs/
+*.parquet
+*.pkl
+*.npy
+*.xlsx
+*.xls
+*.csv
+
+# --- credentials --------------------------------------------------------------
+# The real secrets live in ~/.config/prc2026/s3.env, outside both the repo and
+# the synced Dropbox tree. These rules are a second line of defence.
+*.env
+*.pem
+*.key
+secrets*
+
+# --- noise --------------------------------------------------------------------
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+logs/
