@@ -23,6 +23,7 @@ secrets*
 
 # --- noise --------------------------------------------------------------------
 __pycache__/
+catboost_info/
 *.pyc
 .ipynb_checkpoints/
 .venv/
