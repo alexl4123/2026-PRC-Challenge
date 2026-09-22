@@ -27,13 +27,17 @@ def main(campaign):
 
     # Filenames are r-<regconfig>__c-<clfconfig>__seedNN__mMM.npy (the grid
     # campaign) or <config>__seedNN__mMM.npy (the older campaigns).
+    # NOTE: the loop variable is deliberately NOT called `month` -- an earlier
+    # version shadowed the month ARRAY built above, so `month == m` later became
+    # an int-to-int comparison returning a scalar False, and `p[False]` silently
+    # produced a (0, N)-shaped view instead of raising anything sensible.
     parts = defaultdict(dict)
     for f in files:
         bits = f.stem.split('__')
-        month = int(bits[-1][1:])
+        mm = int(bits[-1][1:])
         seed = bits[-2]
         arm = '__'.join(bits[:-2])
-        parts[(arm, seed)][month] = np.load(f)
+        parts[(arm, seed)][mm] = np.load(f)
 
     oof = {}
     for (cfg, seed), bym in sorted(parts.items()):
@@ -42,8 +46,20 @@ def main(campaign):
             print(f'  {cfg}/{seed}: INCOMPLETE, missing months {missing} -- skipped')
             continue
         p = np.full(len(y), np.nan)
+        ok = True
         for m, v in bym.items():
-            p[month == m] = v
+            sel = month == m
+            if sel.sum() != len(v):
+                print(f'  {cfg}/{seed}: month {m} has {sel.sum():,} rows but the task '
+                      f'wrote {len(v):,} predictions -- SKIPPED (stale or wrong cache?)')
+                ok = False
+                break
+            p[sel] = v
+        if not ok:
+            continue
+        if not np.isfinite(p).all():
+            print(f'  {cfg}/{seed}: {int((~np.isfinite(p)).sum()):,} rows unfilled -- skipped')
+            continue
         oof[(cfg, seed)] = p
 
     print(f'\n{len(oof)} complete OOF sets from {len(files)} task outputs\n')
