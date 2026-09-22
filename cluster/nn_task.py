@@ -61,7 +61,10 @@ def main():
     # The network serves the bulk only, so it is fitted on bulk rows -- matching
     # how the LightGBM regressor is trained in every other arm.
     bulk_trn = trn & (y <= TAIL_CAP)
-    codes, cards, Z, _ = numeric_design(X, cols, fit_mask=bulk_trn)
+    # numeric_design returns SIX values (codes, cards, Z, cat_cols, num_cols,
+    # stats) -- its own docstring says four, which is wrong. Take the first
+    # three, and pass X[cols] rather than X, matching how exp45 calls it.
+    codes, cards, Z = numeric_design(X[cols], cols, fit_mask=bulk_trn)[:3]
     pred_bulk_all = fit_predict(codes, Z, y, bulk_trn, va, epochs=a.epochs,
                                 batch=a.batch, seed=a.seed, threads=a.threads,
                                 device=str(dev), log=lambda m: print(m, flush=True))

@@ -26,7 +26,13 @@ if torch.cuda.is_available():
           '|', torch.cuda.get_device_name(0),
           '| capability', torch.cuda.get_device_capability(0))
 else:
-    print('NOTE: on the login node this is expected. Verify on a GPU node with:')
-    print('  srun -p gpu --gres=gpu:1 -t 00:05:00 python -c '
-          '"import torch;print(torch.cuda.get_device_name(0))"')
+    print('NOTE: on the login node this is expected -- devices are confined per')
+    print('      cgroup, so copperhead itself sees none. Verify on a GPU node.')
+    print('      Use the ABSOLUTE interpreter path: this script activated the')
+    print('      env in its own subshell, so your shell is still on base and a')
+    print('      bare `python` under srun would be the wrong one.')
+    print()
+    print('  srun -p gpu --gres=gpu:1 -t 00:05:00 \\')
+    print('    ~/miniconda3/envs/prc2026gpu/bin/python \\')
+    print('    -c "import torch;print(torch.cuda.get_device_name(0))"')
 PY
