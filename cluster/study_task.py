@@ -97,8 +97,14 @@ def fit_bulk(family, X, y, trn, cols, cats, seed, threads, apt=None, va=None):
         Xa = X.loc[k, cols].copy()
         Xb = X.loc[va, cols].copy()
         for c in cats:
-            Xa[c] = Xa[c].astype(str)
-            Xb[c] = Xb[c].astype(str)
+            # CatBoost rejects a NaN in a cat_feature outright: "cat_features
+            # must be integer or string, real number values and NaN values
+            # should be converted to string". `.astype(str)` on a pandas
+            # categorical does NOT do that -- it leaves the missing value
+            # missing -- so the null has to be replaced explicitly. STAND_mvt
+            # is the column that trips it.
+            Xa[c] = np.where(Xa[c].isna(), 'NA', Xa[c].astype(str))
+            Xb[c] = np.where(Xb[c].isna(), 'NA', Xb[c].astype(str))
         m = CatBoostRegressor(iterations=2000, learning_rate=0.05, depth=8,
                               loss_function='RMSE', random_seed=seed,
                               thread_count=threads, verbose=0)
