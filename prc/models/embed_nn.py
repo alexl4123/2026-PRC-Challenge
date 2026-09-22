@@ -171,9 +171,17 @@ def fit_predict(codes, Z, y, train_mask, pred_mask, *, epochs=8, batch=4096,
 
 
 def _predict(net, C, Z, mu, sd, batch=16384):
+    """Predictions in seconds, always as a host-side numpy array.
+
+    `.cpu()` before `.numpy()` is not optional: C and Z live on whatever device
+    the net was trained on, and calling .numpy() on a CUDA tensor raises. That
+    bug survived a local CPU smoke test precisely because .numpy() works there --
+    the device path is the one path that cannot be exercised without a GPU.
+    """
     net.eval()
     out = np.empty(C.shape[0], dtype=np.float64)
     with torch.no_grad():
         for i in range(0, C.shape[0], batch):
-            out[i:i + batch] = net(C[i:i + batch], Z[i:i + batch]).numpy()
+            pred = net(C[i:i + batch], Z[i:i + batch])
+            out[i:i + batch] = pred.detach().cpu().numpy()
     return np.clip(out * sd + mu, 0, None)
