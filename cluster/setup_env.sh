@@ -11,8 +11,8 @@ else
 fi
 conda activate prc2026
 pip install -q --upgrade pip
-pip install -q "pyarrow>=20" pandas numpy scikit-learn lightgbm
-python -c "import pyarrow,pandas,lightgbm,numpy;
+pip install -q "pyarrow>=20" pandas numpy scikit-learn lightgbm catboost xgboost
+python -c "import pyarrow,pandas,lightgbm,numpy,catboost,xgboost;
 print('pyarrow',pyarrow.__version__,'pandas',pandas.__version__,'lgbm',lightgbm.__version__)"
 echo "NOTE: the system pyarrow 19 cannot read the challenge parquets"
 echo "      ('Repetition level histogram size mismatch'); >=20 is required."

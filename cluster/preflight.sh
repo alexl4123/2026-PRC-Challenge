@@ -28,6 +28,14 @@ if conda activate prc2026 2>/dev/null; then
         v=$(python -c "import $m;print($m.__version__)" 2>/dev/null) \
             && ok "$m $v" || bad "$m not importable"
     done
+    # Only the study campaign needs these; warn rather than fail so the other
+    # campaigns still pass preflight on an older environment.
+    for m in catboost xgboost; do
+        v=$(python -c "import $m;print($m.__version__)" 2>/dev/null) \
+            && ok "$m $v" \
+            || printf '  \033[33mwarn\033[0m %s\n' \
+               "$m missing -- needed only by cluster/study_array.sbatch; rerun cluster/setup_env.sh"
+    done
 else
     bad "conda env 'prc2026' missing -- run: bash cluster/setup_env.sh"
 fi
