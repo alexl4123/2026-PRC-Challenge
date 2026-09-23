@@ -40,6 +40,7 @@ import pandas as pd
 import lightgbm as lgb
 
 from ..config import TAIL_CAP
+from .tail_specialist import TailSpecialist, population, apply_to_mixture
 
 ROUTE_A, ROUTE_B, ROUTE_C, ROUTE_D = 'A', 'B', 'C', 'D'
 
@@ -58,10 +59,17 @@ class RoutedModel:
     """Fit/predict with four routes. `reg_cols` may differ from `clf_cols`."""
 
     def __init__(self, reg_cols, clf_cols, cats, seed=0, threads=8,
-                 leaves=511, rounds=1400, lr=0.025):
+                 leaves=511, rounds=1400, lr=0.025, specialist=False):
         self.reg_cols, self.clf_cols, self.cats = reg_cols, clf_cols, cats
         self.seed, self.threads = seed, threads
         self.leaves, self.rounds, self.lr = leaves, rounds, lr
+        # When True, P(tail|x) inside P = {route D} AND {sched_off > 7200} comes
+        # from prc.models.tail_specialist instead of m_d_clf. Route D's own
+        # classifier already sees a 2.14% tail rate rather than the global
+        # 0.028%, but it is still fitted on 22,470 rows to serve a decision
+        # that only 4,944 of them participate in. The specialist is fitted on
+        # exactly those 4,944.
+        self.specialist = specialist
 
     def _reg(self, **kw):
         p = dict(objective='regression', metric='rmse', learning_rate=self.lr,
@@ -110,6 +118,13 @@ class RoutedModel:
             num_boost_round=300)
         dt = d & (y > TAIL_CAP)
         self.d_tail_mean = float(y[dt].mean()) if dt.any() else 20000.0
+
+        self.spec_ = None
+        if self.specialist:
+            apt = X['APT'].astype(str).to_numpy()
+            miss = ~np.isfinite(np.asarray(proxy, float))
+            self.spec_ = TailSpecialist(threads=self.threads).fit(
+                X, y, apt, sched_off, miss)
         return self
 
     def predict(self, X, proxy, sched_off):
@@ -132,6 +147,11 @@ class RoutedModel:
             pb = self.m_d_bulk.predict(X.loc[d, self.reg_cols])
             pt = self.m_d_clf.predict(X.loc[d, self.clf_cols])
             so = sched_off[d]
+            if self.spec_ is not None:
+                apt_d = X.loc[d, 'APT'].astype(str).to_numpy()
+                p_spec, in_P = self.spec_.predict(
+                    X.loc[d], apt_d, so, np.ones(int(d.sum()), bool))
+                pt = apply_to_mixture(pt, p_spec, in_P)
             et = np.where(np.isfinite(so) & (so > TAIL_CAP), so, self.d_tail_mean)
             out[d] = pt * et + (1 - pt) * pb
 
