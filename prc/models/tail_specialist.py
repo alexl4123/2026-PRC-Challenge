@@ -153,3 +153,53 @@ def apply_to_mixture(p_global, p_spec, in_P):
     k = in_P & np.isfinite(p_spec)
     p[k] = p_spec[k]
     return p
+
+
+class TailSpecialistX(TailSpecialist):
+    """TailSpecialist whose LightGBM component also sees `extra` columns (exp62).
+
+    The (airport x off_sched) table and the isotonic components are fitted and
+    averaged exactly as in TailSpecialist; only the GBM's inputs grow. The caller
+    supplies the extra columns in X -- including any target encodings, which must
+    be computed in-fold (see prc.p_features.te_features). With extra=() this is
+    the shipped specialist.
+    """
+
+    def __init__(self, extra=(), **kw):
+        super().__init__(**kw)
+        self.extra = list(extra)
+
+    def fit(self, X, y, apt, off_sched, aobt_missing):
+        super().fit(X, y, apt, off_sched, aobt_missing)
+        if not self.extra:
+            return self
+        missing = [c for c in self.extra if c not in X.columns]
+        if missing:
+            raise KeyError(f'TailSpecialistX: extra columns absent from X: {missing}')
+        P = population(off_sched, aobt_missing)
+        t = (np.asarray(y, float) > TAIL_CAP).astype(int)
+        feats = SPEC_FEATURES + self.extra
+        cat = [c for c in feats if str(X[c].dtype) == 'category']
+        mono = [1 if c in ('off_sched', 'log_off_sched') else 0 for c in feats]
+        self.gbms_ = [
+            lgb.train(dict(SPEC_PARAMS, seed=s, bagging_seed=s + 1,
+                           feature_fraction_seed=s + 2, num_threads=self.threads,
+                           monotone_constraints=mono),
+                      lgb.Dataset(X.loc[P, feats], t[P], categorical_feature=cat),
+                      num_boost_round=self.rounds)
+            for s in self.seeds]
+        return self
+
+    def predict(self, X, apt, off_sched, aobt_missing):
+        if not self.extra:
+            return super().predict(X, apt, off_sched, aobt_missing)
+        P = population(off_sched, aobt_missing)
+        out = np.full(len(X), np.nan)
+        if not P.any():
+            return out, P
+        Xp = X.loc[P, SPEC_FEATURES + self.extra]
+        os_v, apt_v = np.asarray(off_sched, float)[P], np.asarray(apt)[P]
+        gbm = np.mean([m.predict(Xp) for m in self.gbms_], axis=0)
+        out[P] = np.clip((gbm + self._table_predict(apt_v, os_v)
+                          + self._iso_predict(apt_v, os_v)) / 3.0, 0.0, 1.0)
+        return out, P
