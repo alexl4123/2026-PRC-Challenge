@@ -143,7 +143,7 @@ def to_int32(pred):
     return np.rint(np.clip(np.asarray(pred, float), 0.0, 200000.0)).astype(np.int32)
 
 
-def stage_assemble(specialist, w, version, check_against):
+def stage_assemble(specialist, w, version, check_against, w_abc=None, w_d=None):
     if not COMP.exists():
         sys.exit(f'FATAL: {COMP} missing -- run --stage components first')
     c = np.load(COMP, allow_pickle=True)
@@ -161,6 +161,22 @@ def stage_assemble(specialist, w, version, check_against):
                      '(ids or P mask differ)')
         p_spec = s['p_spec']
 
+    # Per-row network weight. Route D = no NM off-block record (AOBT_3_flt missing).
+    # v9: the network deserves ~0.65 on ordinary flights (stable across 1/2/3 LightGBM
+    # seeds) but route D's optimum is unstable, so it keeps v8's value. See the log.
+    if w_abc is not None or w_d is not None:
+        from prc.io import load
+        rk = load('ranking', phase='DEP', columns=[ID, 'AOBT_3_flt'])
+        if not np.array_equal(rk[ID].to_numpy(), ids):
+            sys.exit('FATAL: ranking order differs from the cached components')
+        route_d = rk['AOBT_3_flt'].isna().to_numpy()
+        wv = np.where(route_d, w if w_d is None else w_d, w if w_abc is None else w_abc)
+        print(f'per-route network weight: {w if w_abc is None else w_abc} on {int((~route_d).sum()):,} '
+              f'rows with an NM record, {w if w_d is None else w_d} on {int(route_d.sum()):,} without')
+    else:
+        wv = np.full(len(ids), w)
+    w = float(wv.max())                               # "> 0" test below: is the network used at all?
+
     if w > 0:
         seeds = sorted(NET.glob('nn_final_seed*.npy'))
         if len(seeds) != 3:
@@ -177,7 +193,7 @@ def stage_assemble(specialist, w, version, check_against):
     preds = []
     for seed in range(pb.shape[0]):
         p = apply_to_mixture(pt[seed], p_spec, in_P)
-        pbm = (1 - w) * pb[seed] + w * net
+        pbm = (1 - wv) * pb[seed] + wv * net
         preds.append(np.clip(p * et + (1 - p) * pbm, 0, None))
     pred = np.mean(preds, axis=0)
 
@@ -212,6 +228,10 @@ def main():
     ap.add_argument('--stage', required=True, choices=['components', 'assemble'])
     ap.add_argument('--specialist', default='x', choices=['v6', 'x'])
     ap.add_argument('--w', type=float, default=0.5, help='weight on the network (0.5 fixed in advance)')
+    ap.add_argument('--w-abc', type=float, default=None,
+                    help='network weight on rows WITH an NM off-block record (routes A/B/C); default --w')
+    ap.add_argument('--w-d', type=float, default=None,
+                    help='network weight on rows WITHOUT one (route D); default --w')
     ap.add_argument('--version', type=int, default=8)
     ap.add_argument('--check-against', type=int, default=None,
                     help='compare with outputs/<team>_vN.parquet instead of building')
@@ -223,7 +243,7 @@ def main():
             return
         stage_components(a.threads)
     else:
-        stage_assemble(a.specialist, a.w, a.version, a.check_against)
+        stage_assemble(a.specialist, a.w, a.version, a.check_against, a.w_abc, a.w_d)
 
 
 if __name__ == '__main__':
