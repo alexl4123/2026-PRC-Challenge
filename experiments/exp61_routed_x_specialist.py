@@ -150,12 +150,12 @@ for a in P:
         continue
     b = paired_bootstrap(yy, P[a], P['mix'])
     print(f'    {a:12s} {b["diff"]:+8.2f} +- {b["sd"]:5.2f}  '
-          f'CI [{b["lo"]:+8.2f}, {b["hi"]:+8.2f}]  P(worse) {b["p_worse"]*100:5.1f}%')
+          f'CI [{b["lo"]:+8.2f}, {b["hi"]:+8.2f}]  P(worse) {b["p_a_worse"]*100:5.1f}%')
 
 print(f'\n  is the specialist redundant once routing has concentrated the problem?')
 b = paired_bootstrap(yy, P['routed+spec'], P['routed'])
 print(f'    routed+spec vs routed  {b["diff"]:+8.2f} +- {b["sd"]:5.2f}  '
-      f'CI [{b["lo"]:+8.2f}, {b["hi"]:+8.2f}]  P(worse) {b["p_worse"]*100:5.1f}%')
+      f'CI [{b["lo"]:+8.2f}, {b["hi"]:+8.2f}]  P(worse) {b["p_a_worse"]*100:5.1f}%')
 
 np.save('cache/exp61_preds.npy', np.vstack([P[a] for a, _, _ in ARMS]))
 np.save('cache/exp61_y.npy', yy)
