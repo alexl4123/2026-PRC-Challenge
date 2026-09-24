@@ -40,15 +40,16 @@ import torch
 import torch.nn as nn
 
 
-def emb_dim(card: int) -> int:
+def emb_dim(card: int, cap: int = 32) -> int:
     """Embedding width for a categorical with `card` levels.
 
-    The usual 1.6 * n^0.56 rule, floored at 3 and capped at 32. The cap matters:
+    The usual 1.6 * n^0.56 rule, floored at 3 and capped at `cap` (32 unless a
+    caller asks otherwise; the 2026-09-23 sweep measured cap 16 at -0.59 s). The cap matters:
     uncapped it asks for 110 dimensions for STAND_mvt, which is more parameters
     in one table than in the rest of the network and overfits 1,899 levels whose
     median frequency is about 500 rows.
     """
-    return int(min(32, max(3, round(1.6 * card ** 0.56))))
+    return int(min(cap, max(3, round(1.6 * card ** 0.56))))
 
 
 def remap_unseen(codes: np.ndarray, train_mask: np.ndarray) -> np.ndarray:
@@ -63,14 +64,14 @@ def remap_unseen(codes: np.ndarray, train_mask: np.ndarray) -> np.ndarray:
 
 
 class EmbedMLP(nn.Module):
-    def __init__(self, cards, n_num, hidden=(512, 256, 128), dropout=0.10):
+    def __init__(self, cards, n_num, hidden=(512, 256, 128), dropout=0.10, emb_cap=32):
         super().__init__()
-        self.embs = nn.ModuleList([nn.Embedding(c, emb_dim(c)) for c in cards])
+        self.embs = nn.ModuleList([nn.Embedding(c, emb_dim(c, emb_cap)) for c in cards])
         for e in self.embs:
             nn.init.normal_(e.weight, 0.0, 0.05)
             with torch.no_grad():
                 e.weight[0].zero_()          # the missing/unseen slot starts neutral
-        d_in = sum(emb_dim(c) for c in cards) + n_num
+        d_in = sum(emb_dim(c, emb_cap) for c in cards) + n_num
         layers, d = [nn.BatchNorm1d(d_in)], d_in
         for h in hidden:
             layers += [nn.Linear(d, h), nn.BatchNorm1d(h), nn.GELU(), nn.Dropout(dropout)]
@@ -106,7 +107,7 @@ def resolve_device(device=None):
 
 def fit_predict(codes, Z, y, train_mask, pred_mask, *, epochs=8, batch=4096,
                 lr=3e-3, weight_decay=1e-5, hidden=(512, 256, 128), dropout=0.10,
-                seed=0, threads=4, log=print, eval_hook=None, device=None):
+                seed=0, threads=4, log=print, eval_hook=None, device=None, emb_cap=32):
     """Train on `train_mask`, return predictions for `pred_mask` (seconds).
 
     `eval_hook(epoch, pred)` is called after each epoch with the current
@@ -135,7 +136,7 @@ def fit_predict(codes, Z, y, train_mask, pred_mask, *, epochs=8, batch=4096,
     Cpr = torch.from_numpy(np.ascontiguousarray(codes[pred_mask])).long().to(dev)
     Zpr = torch.from_numpy(np.ascontiguousarray(Z[pred_mask])).to(dev)
 
-    net = EmbedMLP(cards, Z.shape[1], hidden=hidden, dropout=dropout).to(dev)
+    net = EmbedMLP(cards, Z.shape[1], hidden=hidden, dropout=dropout, emb_cap=emb_cap).to(dev)
     opt = torch.optim.AdamW(net.parameters(), lr=lr, weight_decay=weight_decay)
     n = Ctr.shape[0]
     steps = epochs * ((n + batch - 1) // batch)

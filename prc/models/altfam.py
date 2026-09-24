@@ -161,7 +161,7 @@ def mixture(p_tail, pred_bulk, off_sched, tail_mean):
 # pandas categorical.
 # ---------------------------------------------------------------------------
 
-def numeric_design(X, cols, fit_mask=None, missing='median'):
+def numeric_design(X, cols, fit_mask=None, missing='median', cats=None):
     """Split `cols` into (codes, cards, Z, num_cols).
 
     `fit_mask` selects the rows the imputation median and the scale are computed
@@ -193,8 +193,9 @@ def numeric_design(X, cols, fit_mask=None, missing='median'):
                     so 'absent' is its own region of input space that the first
                     layer can separate linearly.
     """
-    cat_cols = [c for c in cols if c in CATS]
-    num_cols = [c for c in cols if c not in CATS]
+    cats = CATS if cats is None else cats      # W2 passes CATS + ['ADES_mvt']; default unchanged
+    cat_cols = [c for c in cols if c in cats]
+    num_cols = [c for c in cols if c not in cats]
 
     codes = np.empty((len(X), len(cat_cols)), dtype=np.int32)
     cards = []
