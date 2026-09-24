@@ -38,7 +38,7 @@ echo "task $i -> family $FAM seed $SEED month $MONTH"
 
 source "$HOME/miniconda3/etc/profile.d/conda.sh" 2>/dev/null \
     || source "$HOME/anaconda3/etc/profile.d/conda.sh"
-conda activate prc2026gpu
+conda activate prc2026          # the CPU env: has xgboost (prc2026gpu does not)
 
 srun python cluster/w2_task.py --family "$FAM" --seed "$SEED" --month "$MONTH" \
      --threads "$SLURM_CPUS_PER_TASK"
