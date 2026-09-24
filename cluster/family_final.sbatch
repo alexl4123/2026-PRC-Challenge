@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=prc-famfinal
-#SBATCH --partition=any
+#SBATCH --partition=gpu
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=24G
 #SBATCH --time=03:00:00
 #SBATCH --output=logs/%x_%A_%a.out
-#SBATCH --array=0-11
+#SBATCH --array=0-11%4
 #
 # Final fits for the v10 family blend: 4 families x 3 seeds = 12 tasks.
 #
