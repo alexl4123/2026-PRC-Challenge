@@ -62,6 +62,8 @@ def family_oof(fam, month, n):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--per-route', action='store_true', help='separate weights for route D')
+    ap.add_argument('--members', default=None,
+                    help='comma-separated subset of families to blend (default: every complete one)')
     a = ap.parse_args()
 
     d = load('training', phase='DEP', columns=[TARGET, 'MVT_TIME_UTC_mvt', 'SCHED_TIME_UTC_mvt',
@@ -74,7 +76,10 @@ def main():
     n = len(y)
 
     members, names = [], []
+    wanted = set(a.members.split(',')) | {'mix', 'nn'} if a.members else None
     for fam in FAMILIES:
+        if wanted is not None and fam not in wanted:
+            continue
         o, k = family_oof(fam, month, n)
         print(f'  {fam:<9} {"complete seeds: " + str(k) if k else "not complete -- skipped"}')
         if o is not None:
@@ -82,6 +87,7 @@ def main():
     if 'mix' not in names or 'nn' not in names:
         sys.exit('FATAL: need at least mix and nn for the production baseline')
     X = np.column_stack(members)
+    use = [i for i, nm in enumerate(names) if a.members is None or nm in a.members.split(',')]
 
     # production structure (v9): LightGBM + network, 0.65 with an NM record, 0.5 without
     wv = np.where(D, 0.5, 0.65)
@@ -91,7 +97,8 @@ def main():
     groups = [('route D', D), ('routes A/B/C', ~D)] if a.per_route else [('all', np.ones(n, bool))]
     blend = np.empty(n); weights = {}
     for gname, g in groups:
-        w, _ = nnls(X[fit & g], y[fit & g])
+        wu, _ = nnls(X[fit & g][:, use], y[fit & g])
+        w = np.zeros(len(names)); w[use] = wu
         weights[gname] = dict(zip(names, np.round(w, 4).tolist()))
         blend[g] = X[g] @ w
         print(f'\n  weights ({gname}), fitted on months {SCREEN} outside P, sum {w.sum():.3f}:')
