@@ -1,4 +1,4 @@
-"""EXP70 -- v12 = v10 + the reviewed feature stack, arm (c), outside P.
+"""EXP70 -- v11 = v10 + the reviewed feature stack, arm (c), outside P.
 
 The stack (experiments/v11/, built 2026-09-24 by the inside agent) is a residual
 LightGBM on NM clock differences, destination, previous-arrival stamping and the
@@ -23,10 +23,10 @@ assert (np.rint(v10f).astype(int) == v10.reindex(ids).to_numpy()).all(), 'recons
 inP = st['in_P'].astype(bool); corr = st['corr']
 assert np.isnan(corr[inP]).all() and np.isfinite(corr[~inP]).all(), 'corr must be NaN exactly on P'
 pred = v10f + np.where(inP, 0.0, corr)
-path = build(ids, pred, version=12, clip=(0.0, 200000.0))
-v12 = pd.read_parquet(path).set_index('MVT_ID_mvt')['TAXITIME_SEC_mvt'].reindex(ids).to_numpy()
-d = (v12 - v10.reindex(ids).to_numpy()).astype(float)
-print(f'v12 vs v10: rows changed {int((d != 0).sum()):,} | inside P changed: {int((d[inP] != 0).sum())} | '
+path = build(ids, pred, version=11, clip=(0.0, 200000.0))
+v11 = pd.read_parquet(path).set_index('MVT_ID_mvt')['TAXITIME_SEC_mvt'].reindex(ids).to_numpy()
+d = (v11 - v10.reindex(ids).to_numpy()).astype(float)
+print(f'v11 vs v10: rows changed {int((d != 0).sum()):,} | inside P changed: {int((d[inP] != 0).sum())} | '
       f'mean shift {d.mean():+.2f}s | |shift| median {np.median(np.abs(d)):.0f}s, p99 {np.percentile(np.abs(d),99):.0f}s, '
       f'max +{d.max():.0f} / {d.min():.0f}')
 print(f'  corr: mean {corr[~inP].mean():+.1f}s | share of rows with |corr| > 300 s: {np.mean(np.abs(corr[~inP]) > 300):.4f}')

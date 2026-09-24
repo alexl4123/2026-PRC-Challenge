@@ -38,7 +38,7 @@ builds the same blend with weights {LightGBM 0.35, network 0.65} on routes A/B/C
 {0.5, 0.5} on route D -- v9's -- and must reproduce outputs/..._v9.parquet exactly.
 It needs no family files.
 
-    python experiments/exp67_submit_v10.py --version 11     (v10 was the route-D correction)
+    python experiments/exp67_submit_v10.py --version N      (explicit; v10 = route-D corrector, v11 = feature stack)
 """
 import argparse, json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -71,7 +71,7 @@ def load_seeds(folder, prefix, ids):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--version', type=int, default=11)   # v10 = the route-D (Amsterdam) correction
+    ap.add_argument('--version', type=int, required=True)   # always explicit: v10 = route-D corrector, v11 = feature stack
     ap.add_argument('--check-v9', action='store_true',
                     help="use v9's weights and compare with the v9 parquet instead of building")
     a = ap.parse_args()

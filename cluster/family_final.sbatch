@@ -9,8 +9,12 @@
 #
 # Final fits for the v10 family blend: 4 families x 3 seeds = 12 tasks.
 #
-#   sbatch cluster/family_final.sbatch                      # CPU partition
-#   sbatch -p gpu --array=0-11%8 cluster/family_final.sbatch  # or the GPU node's idle CPUs
+#   sbatch cluster/family_final.sbatch                  # all 12 on the GPU node's CPUs, 4 at a time
+#   sbatch --array=0-8 cluster/family_final.sbatch      # perapt/lintree/xgboost only (v12 needs no routed)
+#
+# WHY -p gpu (no GPU requested): on 2026-09-24 the same array on `any` sat PENDING with
+# reason PartitionTimeLimit -- `any` does not allow the 3 h limit, so it could never start.
+# The GPU node allows up to 7 days and its 64 CPUs were idle; 4 tasks x 8 CPUs = 32 cores.
 #
 #   index: family = (perapt lintree xgboost routed)[i / 3], seed = i % 3
 #
