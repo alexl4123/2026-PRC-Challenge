@@ -7,7 +7,7 @@
 #SBATCH --output=logs/%x_%A_%a.out
 #SBATCH --array=0-11%4
 #
-# Final fits for the v10 family blend: 4 families x 3 seeds = 12 tasks.
+# Final fits for the family blend (shipped as v12 on NM-record flights): 4 families x 3 seeds.
 #
 #   sbatch cluster/family_final.sbatch                  # all 12 on the GPU node's CPUs, 4 at a time
 #   sbatch --array=0-8 cluster/family_final.sbatch      # perapt/lintree/xgboost only (v12 needs no routed)
