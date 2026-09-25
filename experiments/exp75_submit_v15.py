@@ -8,7 +8,12 @@ WHAT CHANGES (the Amsterdam route-D corrector is kept everywhere; it is additive
   P (1,720 rows): v14 serves p * et + (1 - p) * (0.5 pb_LGB + 0.5 network) + the corrector, with
       v13/v14's TabICL p. v15 swaps the real-taxi branch for 0.5 W2-LightGBM + 0.5 W2-network bulk:
           delta = mix(p, pbm_W2) - mix(p, pbm_old)     (per LGB seed, p unchanged)
+  routes A/B/C outside P: v14 used the SEED-0 blend weights (cache/w2/w2_weights_seed0.json); v15
+      uses the confirmed 3-seed weights (cache/w2/w2_weights.json):  delta = blend_3seed - blend_seed0
+      (--check-v14 first proves that the seed-0 weights reproduce v14 there from v13).
 Every other row is v14 unchanged. W2 finals: seeds 0-2 only (the CV weights were fitted on those).
+3-seed CV (2026-09-25): A/B/C new vs shipped -2.06 [-2.44,-1.73] held-out / -3.37 scored;
+    D1 -0.70 [-1.13,-0.31] / -0.67 [-1.34,-0.08];  P1 -0.44 [-0.62,-0.29] / -0.35.
 
 EVIDENCE (experiments/w2/w2_routeD_P.py --seeds 0, all flights, baseline = v14 structure on 2025 OOF):
     D1 route D + corrector   12m -0.67 [-1.11,-0.26]  scored -0.52 [-1.23,+0.14]  10/12
@@ -41,9 +46,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--version', type=int, default=None)
     ap.add_argument('--check', action='store_true')
+    ap.add_argument('--check-v14', action='store_true', help='seed-0 weights must reproduce v14 on A/B/C')
     a = ap.parse_args()
-    if not a.check and a.version is None:
-        sys.exit('pass --version N (explicit) or --check')
+    if not (a.check or a.check_v14) and a.version is None:
+        sys.exit('pass --version N (explicit), --check or --check-v14')
 
     c = np.load(CACHE / 'final' / 'lgb_components.npz', allow_pickle=True)
     ids, pb, pt, et, in_P = c['ids'], c['pb'], c['pt'], c['et'], c['in_P'].astype(bool)
@@ -58,6 +64,43 @@ def main():
     corr = np.where(st['in_P'].astype(bool), 0.0, st['corr'].astype(float))
     net = np.mean([np.load(CACHE / 'nn_final' / f'nn_final_seed{s:02d}.npy').astype(float) for s in range(3)], axis=0)
     S = range(pb.shape[0])
+
+    # --- routes A/B/C outside P: seed-0 weights (as shipped in v14) -> 3-seed weights
+    ABC = ~D & ~in_P
+    W0 = json.load(open(CACHE / 'w2' / 'w2_weights_seed0.json'))
+    W3 = json.load(open(CACHE / 'w2' / 'w2_weights.json'))
+    assert W0['seeds'] == [0] and W3['seeds'] == [0, 1, 2]
+
+    def w2_blend(W):
+        mem = {f: seeds012(f, ids) for f, w in W.items() if w > 0}
+        out = []
+        for s in S:
+            p = pt[s]; Wb = sum(W.get(f, 0.0) for f in BULK)
+            pbm = sum(W[f] * mem[f] for f in BULK if W.get(f, 0.0) > 0)
+            o = Wb * p * et + (1 - p) * pbm
+            if W.get('routed', 0.0) > 0:
+                o = o + W['routed'] * mem['routed']
+            out.append(np.clip(o, 0, None))
+        return np.mean(out, axis=0)
+
+    b0 = w2_blend(W0['weights']['routes A/B/C'])
+    if a.check_v14:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('exp74', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'exp74_submit_w2.py'))
+        e74 = importlib.util.module_from_spec(spec); spec.loader.exec_module(e74)
+        W_old = json.load(open(e74.OLD_W))['weights']['routes A/B/C']
+        old_m = {'nn': net}
+        for f in ('perapt', 'lintree', 'xgboost'):
+            if W_old.get(f, 0):
+                old_m[f] = e74.seeds_mean(CACHE / 'family_final', f, ids)
+        old = e74.blend(W_old, old_m, pt, et, pb_mix_per_seed=pb)
+        v13 = pd.read_parquet(OUTPUTS / f'{TEAM}_v13.parquet').set_index(ID)['TAXITIME_SEC_mvt'].reindex(ids).to_numpy()
+        v14 = pd.read_parquet(OUTPUTS / f'{TEAM}_v14.parquet').set_index(ID)['TAXITIME_SEC_mvt'].reindex(ids).to_numpy()
+        rec = np.rint(np.clip(v13 + (b0 - old - corr), 0, 2e5)).astype(int)
+        print(f'CHECK-V14: rebuilt with the seed-0 weights, {int((rec[ABC] != v14[ABC]).sum()):,} of {ABC.sum():,} '
+              f'A/B/C rows differ from the shipped v14')
+        return
+    delta_abc = (w2_blend(W3['weights']['routes A/B/C']) - b0) if not a.check else np.zeros(len(ids))
 
     # --- route D outside P
     v9D = np.mean([np.clip(pt[s] * et + (1 - pt[s]) * (0.5 * pb[s] + 0.5 * net), 0, None) for s in S], axis=0)
@@ -78,6 +121,7 @@ def main():
         print('W2 route-D weights: ' + '  '.join(f'{f} {w:.3f}' for f, w in W.items() if w > 0))
     delta = np.zeros(len(ids))
     delta[DnP] = (newD - v9D - corr)[DnP]
+    delta[ABC] = delta_abc[ABC]
 
     # --- inside P: v13/v14 probabilities, real-taxi branch swapped
     t1 = np.load(CACHE / 'strategy' / 'tfm_P_lirf_ranking.npz', allow_pickle=True)
@@ -96,14 +140,14 @@ def main():
         print(f'CHECK (old members in place of W2): max |delta| {np.abs(delta).max():.2e} s -> '
               f'{"IDENTITY" if np.abs(delta).max() < 1e-6 else "NOT ZERO"}')
         return
-    for nm, k in (('route D outside P', DnP), ('P', in_P)):
+    for nm, k in (('A/B/C reweight', ABC), ('route D outside P', DnP), ('P', in_P)):
         print(f'{nm:18s} {k.sum():5,} rows: mean shift {delta[k].mean():+7.1f} s, |shift| median '
               f'{np.median(np.abs(delta[k])):5.0f}, max {delta[k].max():+.0f} / {delta[k].min():+.0f}')
     pred = v14.astype(float) + delta
     path = build(ids, pred, version=a.version, clip=(0.0, 200000.0))
     v15 = pd.read_parquet(path).set_index(ID)['TAXITIME_SEC_mvt'].reindex(ids).to_numpy()
     ch = v15 != v14
-    print(f'v{a.version} vs v14: rows changed {int(ch.sum()):,} (all on route D: {bool(np.all(D[ch]))})')
+    print(f'v{a.version} vs v14: rows changed {int(ch.sum()):,} (route D {int((ch & D).sum()):,}, A/B/C {int((ch & ABC).sum()):,})')
 
 
 if __name__ == '__main__':
