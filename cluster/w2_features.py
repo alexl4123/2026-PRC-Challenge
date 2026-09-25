@@ -21,6 +21,7 @@ equal, so a stale or reordered parquet stops the task instead of silently misali
 Nothing here writes to cache/v11/.
 """
 import os, sys
+from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 import pandas as pd
@@ -39,10 +40,14 @@ TURNOVER = ['si_before_sched', 'si_same_typ', 'sd_prev_to', 'sl_to', 'sl_after_s
             'sl_same_op', 'sn_minus_to', 'sn_same_op', 'sn_same_typ', 'sa_after_to', 'sd_next_to']
 V11_NUM = CLOCKS + STAMP + TURNOVER
 W2_CATS = CATS + ['ADES_mvt']
+# adsb.lol ADS-B features (experiments/adsb/adsb_build_features.py), keyed by MVT_ID_mvt; approved 2026-09-25.
+# NaN where the flight was not seen; adsb_day_ok = 0 where the archive day was not processed.
+ADSB_FILE = CACHE / 'adsb_lol' / 'features_{which}.parquet'
 
 
-def _one(which):
-    """cv_task.assemble()'s build for `which`, plus the v11 columns. Returns (X, meta, groups)."""
+def _one(which, adsb=False):
+    """cv_task.assemble()'s build for `which`, plus the v11 columns (and, with adsb=True, the adsb.lol
+    columns as group 'adsb'). Returns (X, meta, groups)."""
     full = load(which)
     cong = build_cong(full)
     d = full[full.PHASE_mvt.eq('DEP')].reset_index(drop=True)
@@ -67,6 +72,21 @@ def _one(which):
         X[c] = f[c].astype('float32').to_numpy()
     X['ADES_mvt'] = d.ADES_mvt.astype(object).to_numpy()
     groups['v11'] = V11_NUM + ['ADES_mvt']
+    if adsb:
+        path = Path(str(ADSB_FILE).format(which=which))
+        if not path.exists():
+            sys.exit(f'FATAL: {path} missing -- run the adsb.lol stage-2 job and rsync it first')
+        a = pd.read_parquet(path)
+        a = a.drop_duplicates('MVT_ID_mvt').set_index('MVT_ID_mvt').reindex(d[ID].to_numpy())
+        cols = [c for c in a.columns if c.startswith('adsb_')]
+        if a['adsb_day_ok'].isna().any():
+            sys.exit(f'FATAL: {path} does not cover every {which} departure ({int(a.adsb_day_ok.isna().sum()):,} missing ids)')
+        for c in cols:
+            X[c] = a[c].astype('float32').to_numpy()
+        groups['adsb'] = cols
+        print(f'adsb.lol columns: {len(cols)}; {which} rows with the archive day processed '
+              f'{int((a.adsb_day_ok == 1).sum()):,} of {len(a):,}, with an off-block estimate '
+              f'{int(a.adsb_off_best.notna().sum()):,}', flush=True)
     meta = pd.DataFrame({ID: d[ID].to_numpy(), 'month': d.MVT_TIME_UTC_mvt.dt.month.to_numpy()})
     if TARGET in d.columns:
         meta[TARGET] = d[TARGET].astype(float).to_numpy()
@@ -79,18 +99,18 @@ def _align_ades(train_X, *others):
         f['ADES_mvt'] = pd.Categorical(f['ADES_mvt'], categories=vocab)
 
 
-def assemble_w2():
+def assemble_w2(adsb=False):
     """Training only (the CV tasks). Same return shape as cluster.cv_task.assemble()."""
-    X, meta, groups = _one('training')
+    X, meta, groups = _one('training', adsb=adsb)
     X, = align_categories(X)
     _align_ades(X)
     return X, meta[TARGET].to_numpy(), meta['month'].to_numpy(), groups
 
 
-def assemble_w2_pair():
+def assemble_w2_pair(adsb=False):
     """Training AND ranking with one shared vocabulary per categorical (the final fits)."""
-    Xtr, mtr, groups = _one('training')
-    Xrk, mrk, _ = _one('ranking')
+    Xtr, mtr, groups = _one('training', adsb=adsb)
+    Xrk, mrk, _ = _one('ranking', adsb=adsb)
     Xtr, Xrk = align_categories(Xtr, Xrk)
     _align_ades(Xtr, Xrk)
     if list(Xtr.columns) != list(Xrk.columns):
@@ -101,5 +121,5 @@ def assemble_w2_pair():
 def columns(groups):
     """(bulk regressor columns, tail classifier columns). The classifier keeps the 18 base
     columns on purpose (EXP15: extra columns make the 0.02%-positive classifier noisier)."""
-    cols = [c for g in ('base', 'cong', 'wx', 'atfm', 'v11') for c in groups[g]]
+    cols = [c for g in ('base', 'cong', 'wx', 'atfm', 'v11', 'adsb') if g in groups for c in groups[g]]
     return cols, list(groups['base'])
