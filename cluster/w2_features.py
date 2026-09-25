@@ -45,7 +45,7 @@ W2_CATS = CATS + ['ADES_mvt']
 ADSB_FILE = CACHE / 'adsb_lol' / 'features_{which}.parquet'
 
 
-def _one(which, adsb=False):
+def _one(which, adsb=False, extra=False):
     """cv_task.assemble()'s build for `which`, plus the v11 columns (and, with adsb=True, the adsb.lol
     columns as group 'adsb'). Returns (X, meta, groups)."""
     full = load(which)
@@ -87,6 +87,15 @@ def _one(which, adsb=False):
         print(f'adsb.lol columns: {len(cols)}; {which} rows with the archive day processed '
               f'{int((a.adsb_day_ok == 1).sum()):,} of {len(a):,}, with an off-block estimate '
               f'{int(a.adsb_off_best.notna().sum()):,}', flush=True)
+    if extra:                                   # A3 arm 2: wake + backlog-at-schedule + gap_prev_to 6 h cap
+        from cluster import w2_extra
+        e = w2_extra.build(d, which)
+        for c in w2_extra.EXTRA_COLS:
+            X[c] = e[c].to_numpy()
+        if 'gap_prev_to' in X.columns:
+            g = X['gap_prev_to'].to_numpy(dtype=float)
+            X['gap_prev_to'] = np.where(g > w2_extra.MAX_GAP, np.nan, g)
+        groups['extra'] = list(w2_extra.EXTRA_COLS)
     meta = pd.DataFrame({ID: d[ID].to_numpy(), 'month': d.MVT_TIME_UTC_mvt.dt.month.to_numpy()})
     if TARGET in d.columns:
         meta[TARGET] = d[TARGET].astype(float).to_numpy()
@@ -99,18 +108,18 @@ def _align_ades(train_X, *others):
         f['ADES_mvt'] = pd.Categorical(f['ADES_mvt'], categories=vocab)
 
 
-def assemble_w2(adsb=False):
+def assemble_w2(adsb=False, extra=False):
     """Training only (the CV tasks). Same return shape as cluster.cv_task.assemble()."""
-    X, meta, groups = _one('training', adsb=adsb)
+    X, meta, groups = _one('training', adsb=adsb, extra=extra)
     X, = align_categories(X)
     _align_ades(X)
     return X, meta[TARGET].to_numpy(), meta['month'].to_numpy(), groups
 
 
-def assemble_w2_pair(adsb=False):
+def assemble_w2_pair(adsb=False, extra=False):
     """Training AND ranking with one shared vocabulary per categorical (the final fits)."""
-    Xtr, mtr, groups = _one('training', adsb=adsb)
-    Xrk, mrk, _ = _one('ranking', adsb=adsb)
+    Xtr, mtr, groups = _one('training', adsb=adsb, extra=extra)
+    Xrk, mrk, _ = _one('ranking', adsb=adsb, extra=extra)
     Xtr, Xrk = align_categories(Xtr, Xrk)
     _align_ades(Xtr, Xrk)
     if list(Xtr.columns) != list(Xrk.columns):
@@ -121,5 +130,5 @@ def assemble_w2_pair(adsb=False):
 def columns(groups):
     """(bulk regressor columns, tail classifier columns). The classifier keeps the 18 base
     columns on purpose (EXP15: extra columns make the 0.02%-positive classifier noisier)."""
-    cols = [c for g in ('base', 'cong', 'wx', 'atfm', 'v11', 'adsb') if g in groups for c in groups[g]]
+    cols = [c for g in ('base', 'cong', 'wx', 'atfm', 'v11', 'adsb', 'extra') if g in groups for c in groups[g]]
     return cols, list(groups['base'])

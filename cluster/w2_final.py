@@ -44,9 +44,11 @@ def main():
     ap.add_argument('--batch', type=int, default=8192, help='nn only')
     ap.add_argument('--smoke', action='store_true', help='40k training rows, 1 nn epoch, w2_final_smoke/')
     ap.add_argument('--adsb', action='store_true', help='add the adsb.lol columns; writes cache/adsb_final/')
+    ap.add_argument('--extra', action='store_true', help='A3 arm 2 (+ wake / backlog); with --adsb writes cache/adsb2_final/')
     a = ap.parse_args()
 
-    outdir = CACHE / (('adsb' if a.adsb else 'w2') + ('_final_smoke' if a.smoke else '_final'))
+    tag = ('adsb' if a.adsb else 'w2') + ('2' if a.extra else '')
+    outdir = CACHE / (tag + ('_final_smoke' if a.smoke else '_final'))
     outdir.mkdir(parents=True, exist_ok=True)
     out = outdir / f'{a.family}__seed{a.seed:02d}.npy'
     if out.exists():
@@ -58,7 +60,7 @@ def main():
         print(f'device: {dev}', flush=True)
 
     t0 = time.time()
-    Xtr, mtr, Xrk, mrk, groups = assemble_w2_pair(adsb=a.adsb)
+    Xtr, mtr, Xrk, mrk, groups = assemble_w2_pair(adsb=a.adsb, extra=a.extra)
     cols, clf_cols = columns(groups)
     y_tr = mtr[TARGET].to_numpy()
     n_tr, n_rk = len(Xtr), len(Xrk)

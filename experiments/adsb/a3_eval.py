@@ -43,7 +43,11 @@ def bulk(folder, fam, seeds, month):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--seeds', nargs='+', type=int, default=None)
+    ap.add_argument('--old', default='w2', help='comparator campaign (arm 2 is judged against arm 1: --old adsb --new adsb2)')
+    ap.add_argument('--new', default='adsb')
     a = ap.parse_args()
+    global OLD, NEW
+    OLD, NEW = CACHE / 'cv' / a.old, CACHE / 'cv' / a.new
     b = np.load(CACHE / 'v11' / 'base.npz'); P, D, y, month = b['P'], b['D'], b['y'], b['month']
     seeds = a.seeds if a.seeds is not None else [s for s in range(3) if all(complete(NEW, f, s) and complete(OLD, f, s) for f in FAMS)]
     miss = [(f, s) for f in FAMS for s in seeds if not (complete(NEW, f, s) and complete(OLD, f, s))]
@@ -107,8 +111,8 @@ def main():
     print(f'\nshare of the SSE reduction carried by the 100 most-improved rows: {top:.2f}' + ('  <- FLAG' if top > 0.5 else ''))
     print('per airport (all flights, 12 months): ' + '  '.join(
         f'{x} {r(fn, apt == x) - r(fo, apt == x):+.1f}' for x in sorted(set(apt))))
-    json.dump({'members': FAMS, 'seeds': seeds, 'weights': Wn}, open(CACHE / 'w2' / 'adsb_weights.json', 'w'), indent=1)
-    print('saved cache/w2/adsb_weights.json')
+    json.dump({'members': FAMS, 'seeds': seeds, 'weights': Wn}, open(CACHE / 'w2' / f'{a.new}_weights.json', 'w'), indent=1)
+    print(f'saved cache/w2/{a.new}_weights.json')
 
 
 if __name__ == '__main__':

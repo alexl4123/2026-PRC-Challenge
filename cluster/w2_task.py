@@ -53,13 +53,14 @@ def main():
     ap.add_argument('--batch', type=int, default=8192, help='nn only')
     ap.add_argument('--smoke', action='store_true',
                     help='5%% of the training rows, 1 nn epoch, campaign w2_smoke -- plumbing only')
+    ap.add_argument('--extra', action='store_true', help='A3 arm 2: + wake / backlog columns (cluster/w2_extra.py); use --campaign adsb2')
     ap.add_argument('--adsb', action='store_true',
                     help='add the adsb.lol columns (cache/adsb_lol/features_training.parquet); use --campaign adsb')
     a = ap.parse_args()
 
-    if a.adsb and a.campaign == 'w2':
-        sys.exit('FATAL: --adsb must not write into the w2 campaign; pass --campaign adsb')
-    campaign = ('adsb_smoke' if a.adsb else 'w2_smoke') if a.smoke else a.campaign
+    if (a.adsb or a.extra) and a.campaign == 'w2':
+        sys.exit('FATAL: --adsb/--extra must not write into the w2 campaign; pass --campaign adsb / adsb2')
+    campaign = (('adsb' if a.adsb else 'w2') + ('2' if a.extra else '') + '_smoke') if a.smoke else a.campaign
     outdir = CACHE / 'cv' / campaign
     outdir.mkdir(parents=True, exist_ok=True)
     stem = f'{a.family}__seed{a.seed:02d}__m{a.month:02d}'
@@ -73,7 +74,7 @@ def main():
         print(f'device: {dev}', flush=True)
 
     t0 = time.time()
-    X, y, month, groups = assemble_w2(adsb=a.adsb)
+    X, y, month, groups = assemble_w2(adsb=a.adsb, extra=a.extra)
     cols, clf_cols = columns(groups)
     cats = [c for c in W2_CATS if c in cols]
     ccats = [c for c in CATS if c in clf_cols]
