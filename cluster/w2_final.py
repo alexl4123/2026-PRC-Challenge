@@ -7,7 +7,7 @@ training set: all twelve months instead of eleven. Training and ranking are asse
 vocabulary, and the network's scaling is fitted on the training bulk rows only.
 
 Output (cache/w2_final/, ranking DEP order, float32):
-    mix / perapt / lintree / xgboost / nn -> the BULK prediction pb (seconds); the submission
+    mix / perapt / lintree / xgboost / nn / w3 -> the BULK prediction pb (seconds); the submission
         builder applies the production tail branch on top, as for v12
     routed -> its full prediction (it carries its own tail handling)
     ranking_ids.npy -> the matching MVT_ID order
@@ -30,7 +30,7 @@ from cluster.w2_features import assemble_w2_pair, columns, W2_CATS
 from prc.config import TARGET, TAIL_CAP, ID, CACHE
 from prc.io import peak_rss_gb
 
-FAMILIES = ('mix', 'perapt', 'lintree', 'xgboost', 'routed', 'nn')
+FAMILIES = ('mix', 'perapt', 'lintree', 'xgboost', 'routed', 'nn', 'w3')
 
 
 def main():
@@ -51,7 +51,7 @@ def main():
     if out.exists():
         print(f'{out} exists, skipping')
         return
-    if a.family == 'nn':
+    if a.family in ('nn', 'w3'):
         from prc.models.embed_nn import resolve_device
         dev = resolve_device(None if a.device == 'auto' else a.device)
         print(f'device: {dev}', flush=True)
@@ -93,6 +93,16 @@ def main():
                            seed=a.seed, threads=a.threads, device=str(dev), emb_cap=a.emb_cap,
                            log=lambda m: print(m, flush=True))
         pred = np.clip(pred, 0, None)
+    elif a.family == 'w3':
+        from prc.models import w3_net
+        fit = trn & (np.nan_to_num(y, nan=np.inf) <= TAIL_CAP)
+        codes, num, _ = w3_net.design(X, cols, W2_CATS)
+        heads = w3_net.head_index(X['APT'].astype(str).to_numpy())
+        del X
+        pred = w3_net.fit_predict(codes, num, heads, np.nan_to_num(y, nan=0.0), fit, va,
+                                  epochs=1 if a.smoke else a.epochs, batch=a.batch, seed=a.seed,
+                                  threads=a.threads, device=str(dev), emb_cap=a.emb_cap,
+                                  log=lambda m: print(m, flush=True))
     else:
         from cluster.study_task import fit_bulk
         apt = X['APT'].astype(str).to_numpy()

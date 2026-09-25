@@ -31,7 +31,7 @@ from prc.config import TAIL_CAP, CACHE
 from prc.features import CATS
 from prc.io import peak_rss_gb
 
-FAMILIES = ['mix', 'perapt', 'lintree', 'xgboost', 'routed', 'nn']
+FAMILIES = ['mix', 'perapt', 'lintree', 'xgboost', 'routed', 'nn', 'w3']   # w3: prc/models/w3_net.py (W3)
 
 
 def save(path, arr):
@@ -47,7 +47,7 @@ def main():
     ap.add_argument('--seed', type=int, default=0)
     ap.add_argument('--month', type=int, required=True)
     ap.add_argument('--threads', type=int, default=int(os.environ.get('SLURM_CPUS_PER_TASK', 8)))
-    ap.add_argument('--device', default='auto', choices=['auto', 'cpu', 'cuda'], help='nn only')
+    ap.add_argument('--device', default='auto', choices=['auto', 'cpu', 'cuda'], help='nn / w3 only')
     ap.add_argument('--emb-cap', type=int, default=16, help='nn only')
     ap.add_argument('--epochs', type=int, default=12, help='nn only')
     ap.add_argument('--batch', type=int, default=8192, help='nn only')
@@ -63,7 +63,7 @@ def main():
     if out.exists():
         print(f'{out.name} exists, skipping')
         return
-    if a.family == 'nn':
+    if a.family in ('nn', 'w3'):
         from prc.models.embed_nn import resolve_device
         dev = resolve_device(None if a.device == 'auto' else a.device)   # fail fast without --gres
         print(f'device: {dev}', flush=True)
@@ -90,15 +90,23 @@ def main():
         rm = RoutedModel(cols, clf_cols, W2_CATS, seed=a.seed, threads=a.threads)
         rm.fit(X.loc[trn], y[trn], proxy[trn], so_all[trn])
         pred = rm.predict(X.loc[va], proxy[va], so_all[va])
-    elif a.family == 'nn':
+    elif a.family in ('nn', 'w3'):
         from prc.models.altfam import numeric_design, mixture
-        from prc.models.embed_nn import fit_predict
         bulk_trn = trn & (y <= TAIL_CAP)
-        codes, cards, Z = numeric_design(X[cols], cols, fit_mask=bulk_trn, cats=W2_CATS)[:3]
-        pb = np.clip(fit_predict(codes, Z, y, bulk_trn, va, epochs=1 if a.smoke else a.epochs,
-                                 batch=a.batch, seed=a.seed, threads=a.threads, device=str(dev),
-                                 emb_cap=a.emb_cap, log=lambda m: print(m, flush=True)), 0, None)
-        # tail classifier exactly as cluster/nn_task.py
+        if a.family == 'nn':
+            from prc.models.embed_nn import fit_predict
+            codes, cards, Z = numeric_design(X[cols], cols, fit_mask=bulk_trn, cats=W2_CATS)[:3]
+            pb = np.clip(fit_predict(codes, Z, y, bulk_trn, va, epochs=1 if a.smoke else a.epochs,
+                                     batch=a.batch, seed=a.seed, threads=a.threads, device=str(dev),
+                                     emb_cap=a.emb_cap, log=lambda m: print(m, flush=True)), 0, None)
+        else:
+            from prc.models import w3_net
+            codes, num, _ = w3_net.design(X, cols, W2_CATS)
+            pb = np.clip(w3_net.fit_predict(codes, num, w3_net.head_index(apt), y, bulk_trn, va,
+                                            epochs=1 if a.smoke else a.epochs, batch=a.batch, seed=a.seed,
+                                            threads=a.threads, device=str(dev), emb_cap=a.emb_cap,
+                                            log=lambda m: print(m, flush=True)), 0, None)
+        # tail classifier exactly as cluster/nn_task.py (shared by nn and w3)
         mc = lgb.train(dict(objective='binary', metric='auc', learning_rate=0.05,
                             num_leaves=63, min_data_in_leaf=50, feature_fraction=0.8,
                             bagging_fraction=0.8, bagging_freq=1, lambda_l2=1.0,
