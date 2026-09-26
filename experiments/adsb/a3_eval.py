@@ -15,6 +15,12 @@ interval below 0, AND January and July EACH improve on their own (point estimate
 added after the participants' Discord (validation discipline). Also reported: per-airport deltas and the share of
 the gain carried by the 100 most-improved rows (a gain living in < 100 rows is flagged).
 
+C1 RULE (written 2026-09-26 before any C1 fold existed; campaign cache/cv/c1 = arm-2 columns + 8 de-icing share
+columns in all members + nn NaN sentinel), judged against arm 2 with the AIRPORT-DAY BLOCK bootstrap:
+    python experiments/adsb/a3_eval.py --old adsb2 --new c1 --block
+adopt if held-out AND scored improve, the held-out block CI is entirely < 0, January AND July each improve, the
+seeds are matched (>= 2 of 3), and the 100 most-improved rows carry <= 50% of the SSE reduction.
+
     python experiments/adsb/a3_eval.py              # seeds complete in both campaigns
     python experiments/adsb/a3_eval.py --seeds 0    # early read
 """
@@ -25,7 +31,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(HERE), 'w2'))
 import numpy as np, pandas as pd
 from scipy.optimize import nnls
 from prc.config import CACHE
-from prc.validation import paired_bootstrap
+from prc.validation import paired_bootstrap, block_bootstrap
 from w2_eval import oof, complete, SCREEN
 
 FAMS = ['mix', 'nn', 'perapt', 'lintree', 'routed', 'xgboost', 'w3']
@@ -45,6 +51,8 @@ def main():
     ap.add_argument('--seeds', nargs='+', type=int, default=None)
     ap.add_argument('--old', default='w2', help='comparator campaign (arm 2 is judged against arm 1: --old adsb --new adsb2)')
     ap.add_argument('--new', default='adsb')
+    ap.add_argument('--block', action='store_true',
+                    help='airport x local-day block bootstrap (cache/drivers_0926/rows_training.parquet) instead of rows')
     a = ap.parse_args()
     global OLD, NEW
     OLD, NEW = CACHE / 'cv' / a.old, CACHE / 'cv' / a.new
@@ -96,13 +104,22 @@ def main():
     fn = structure(Mn, Wn, pb_w2)
     fnP = structure(Mn, Wn, pb_ad)
 
+    if a.block:
+        rw = pd.read_parquet(CACHE / 'drivers_0926' / 'rows_training.parquet', columns=['apt', 'date_loc', 'y'])
+        if len(rw) != len(y) or not np.allclose(rw.y.to_numpy(float), y, equal_nan=True):
+            sys.exit('FATAL: rows_training.parquet is not row-aligned with base.npz')
+        blk = pd.factorize(rw.apt.astype(str) + '_' + rw.date_loc.astype(str))[0]
+        boot = lambda k, f: block_bootstrap(y[k], f[k], fo[k], blk[k], n_boot=1000)
+    else:
+        boot = lambda k, f: paired_bootstrap(y[k], f[k], fo[k], n_boot=500)
+    print(f'bootstrap: {"airport-day BLOCKS" if a.block else "rows"}')
     held, S = ~np.isin(month, SCREEN), np.isin(month, [1, 7])
     r = lambda f, k: np.sqrt(np.mean((y[k] - f[k]) ** 2))
     print(f'\nold (v16 structure, seeds {seeds}): held-out {r(fo, held):.2f}  scored {r(fo, S):.2f}')
     for nm, f in (('NEW blend (A/B/C + D)  [decisive]', fn), ('NEW blend + ADS-B bulk in P [info]', fnP)):
         out = []
         for scope, k in (('held-out', held), ('scored', S), ('Jan', month == 1), ('Jul', month == 7)):
-            bb = paired_bootstrap(y[k], f[k], fo[k], n_boot=500)
+            bb = boot(k, f)
             out.append(f'{scope} {bb["diff"]:+.2f} [{bb["lo"]:+.2f},{bb["hi"]:+.2f}]')
         per = [r(f, month == m) - r(fo, month == m) for m in range(1, 13)]
         print(f'  {nm}: ' + '  '.join(out) + f'  months better {sum(v < 0 for v in per)}/12')

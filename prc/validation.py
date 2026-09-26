@@ -87,6 +87,29 @@ def paired_bootstrap(y, pred_a, pred_b, n_boot: int = 500, seed: int = 0) -> dic
             'p_a_worse': float((diffs > 0).mean())}
 
 
+def block_bootstrap(y, pred_a, pred_b, block, n_boot: int = 1000, seed: int = 0) -> dict:
+    """paired_bootstrap with whole BLOCKS resampled (airport x local day). Squared error clusters by
+    airport-day (the worst 5% of airport-days carry 23% of ordinary SSE), so the row bootstrap is too
+    narrow for bulk changes; this is the honest interval (RMSE review 2026-09-26). Same keys, plus
+    'point' (the plain RMSE difference) and 'n_blocks'."""
+    y = np.asarray(y, float)
+    da = (y - np.asarray(pred_a, float)) ** 2
+    db = (y - np.asarray(pred_b, float)) ** 2
+    _, inv = np.unique(block, return_inverse=True)
+    SA, SB, N = np.bincount(inv, da), np.bincount(inv, db), np.bincount(inv).astype(float)
+    rng = np.random.default_rng(seed)
+    nb = len(N)
+    diffs = np.empty(n_boot)
+    for i in range(n_boot):
+        w = np.bincount(rng.integers(0, nb, nb), minlength=nb)
+        n = w @ N
+        diffs[i] = np.sqrt(w @ SA / n) - np.sqrt(w @ SB / n)
+    return {'diff': float(diffs.mean()), 'sd': float(diffs.std()),
+            'lo': float(np.percentile(diffs, 2.5)), 'hi': float(np.percentile(diffs, 97.5)),
+            'p_a_worse': float((diffs > 0).mean()),
+            'point': float(np.sqrt(SA.sum() / N.sum()) - np.sqrt(SB.sum() / N.sum())), 'n_blocks': int(nb)}
+
+
 def decompose(y, pred, thr: float = TAIL_CAP) -> dict:
     """Split RMSE into its bulk and tail contributions.
 
