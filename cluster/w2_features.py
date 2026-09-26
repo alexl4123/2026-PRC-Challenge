@@ -43,9 +43,14 @@ W2_CATS = CATS + ['ADES_mvt']
 # adsb.lol ADS-B features (experiments/adsb/adsb_build_features.py), keyed by MVT_ID_mvt; approved 2026-09-25.
 # NaN where the flight was not seen; adsb_day_ok = 0 where the archive day was not processed.
 ADSB_FILE = CACHE / 'adsb_lol' / 'features_{which}.parquet'
+# C1 (2026-09-26): de-icing / disruption shares of OTHER departures (experiments/deice_0926/e01_build_indicators.py,
+# look-ahead within the file, label-free), keyed by MVT_ID_mvt: the 7 share columns the de-icing report kept
+# (reports/2026-09-26_deice_indicator.md s6.3) + dz_taxi_h, the mean adsb.lol taxi of the others within +-60 min.
+DEICE_FILE = CACHE / 'deice_0926' / 'ind_{which}.parquet'
+DEICE_COLS = ['dz_rr_sh_h', 'dz_rr_n_h', 'dz_ls_sh_h', 'dz_rest_h', 'dz_rr_sh_d', 'dz_rr_n_d', 'dz_ls_sh_d', 'dz_taxi_h']
 
 
-def _one(which, adsb=False, extra=False):
+def _one(which, adsb=False, extra=False, deice=False):
     """cv_task.assemble()'s build for `which`, plus the v11 columns (and, with adsb=True, the adsb.lol
     columns as group 'adsb'). Returns (X, meta, groups)."""
     full = load(which)
@@ -96,6 +101,17 @@ def _one(which, adsb=False, extra=False):
             g = X['gap_prev_to'].to_numpy(dtype=float)
             X['gap_prev_to'] = np.where(g > w2_extra.MAX_GAP, np.nan, g)
         groups['extra'] = list(w2_extra.EXTRA_COLS)
+    if deice:                                   # C1: de-icing / disruption shares (DEICE_COLS)
+        path = Path(str(DEICE_FILE).format(which=which))
+        if not path.exists():
+            sys.exit(f'FATAL: {path} missing -- rsync cache/deice_0926/ind_*.parquet from the laptop first')
+        e = pd.read_parquet(path, columns=['MVT_ID_mvt'] + DEICE_COLS).drop_duplicates('MVT_ID_mvt').set_index('MVT_ID_mvt')
+        n_miss = int((~pd.Index(d[ID].to_numpy()).isin(e.index)).sum())
+        if n_miss:
+            sys.exit(f'FATAL: {path} misses {n_miss:,} {which} departures -- rebuild it with e01_build_indicators.py')
+        e = e.reindex(d[ID].to_numpy())[DEICE_COLS].astype('float32').set_axis(X.index)
+        X = pd.concat([X, e], axis=1)
+        groups['deice'] = list(DEICE_COLS)
     meta = pd.DataFrame({ID: d[ID].to_numpy(), 'month': d.MVT_TIME_UTC_mvt.dt.month.to_numpy()})
     if TARGET in d.columns:
         meta[TARGET] = d[TARGET].astype(float).to_numpy()
@@ -108,18 +124,18 @@ def _align_ades(train_X, *others):
         f['ADES_mvt'] = pd.Categorical(f['ADES_mvt'], categories=vocab)
 
 
-def assemble_w2(adsb=False, extra=False):
+def assemble_w2(adsb=False, extra=False, deice=False):
     """Training only (the CV tasks). Same return shape as cluster.cv_task.assemble()."""
-    X, meta, groups = _one('training', adsb=adsb, extra=extra)
+    X, meta, groups = _one('training', adsb=adsb, extra=extra, deice=deice)
     X, = align_categories(X)
     _align_ades(X)
     return X, meta[TARGET].to_numpy(), meta['month'].to_numpy(), groups
 
 
-def assemble_w2_pair(adsb=False, extra=False):
+def assemble_w2_pair(adsb=False, extra=False, deice=False):
     """Training AND ranking with one shared vocabulary per categorical (the final fits)."""
-    Xtr, mtr, groups = _one('training', adsb=adsb, extra=extra)
-    Xrk, mrk, _ = _one('ranking', adsb=adsb, extra=extra)
+    Xtr, mtr, groups = _one('training', adsb=adsb, extra=extra, deice=deice)
+    Xrk, mrk, _ = _one('ranking', adsb=adsb, extra=extra, deice=deice)
     Xtr, Xrk = align_categories(Xtr, Xrk)
     _align_ades(Xtr, Xrk)
     if list(Xtr.columns) != list(Xrk.columns):
@@ -130,5 +146,5 @@ def assemble_w2_pair(adsb=False, extra=False):
 def columns(groups):
     """(bulk regressor columns, tail classifier columns). The classifier keeps the 18 base
     columns on purpose (EXP15: extra columns make the 0.02%-positive classifier noisier)."""
-    cols = [c for g in ('base', 'cong', 'wx', 'atfm', 'v11', 'adsb', 'extra') if g in groups for c in groups[g]]
+    cols = [c for g in ('base', 'cong', 'wx', 'atfm', 'v11', 'adsb', 'extra', 'deice') if g in groups for c in groups[g]]
     return cols, list(groups['base'])

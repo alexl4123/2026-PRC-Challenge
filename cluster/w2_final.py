@@ -16,8 +16,12 @@ A file that exists is skipped, so reruns are safe.
     sbatch cluster/w2_final.sbatch          # CPU members, 5 families x 3 seeds
     sbatch cluster/w2_final_nn.sbatch       # network, 3 seeds, GPU
     python cluster/w2_final.py --family perapt --seed 0 --smoke   # plumbing only (laptop)
+
+C1 (2026-09-26): --adsb --extra --deice --nn-missing sentinel --tag c1 -> cache/c1_final/ (a _config.json in the
+folder stops a later run with other flags from mixing into it).
 """
 import argparse
+import json
 import os
 import sys
 import time
@@ -45,11 +49,29 @@ def main():
     ap.add_argument('--smoke', action='store_true', help='40k training rows, 1 nn epoch, w2_final_smoke/')
     ap.add_argument('--adsb', action='store_true', help='add the adsb.lol columns; writes cache/adsb_final/')
     ap.add_argument('--extra', action='store_true', help='A3 arm 2 (+ wake / backlog); with --adsb writes cache/adsb2_final/')
+    ap.add_argument('--deice', action='store_true', help='C1: + de-icing / disruption shares; needs --tag')
+    ap.add_argument('--nn-missing', default='median', choices=['median', 'sentinel'], help='nn only; non-default needs --tag')
+    ap.add_argument('--tag', default=None, help='output folder cache/<tag>_final/ (default from the flags: w2 / adsb / adsb2)')
     a = ap.parse_args()
 
-    tag = ('adsb' if a.adsb else 'w2') + ('2' if a.extra else '')
+    if (a.deice or a.nn_missing != 'median') and a.tag is None:
+        sys.exit('FATAL: --deice / --nn-missing need an explicit --tag (e.g. --tag c1)')
+    tag = a.tag or (('adsb' if a.adsb else 'w2') + ('2' if a.extra else ''))
     outdir = CACHE / (tag + ('_final_smoke' if a.smoke else '_final'))
     outdir.mkdir(parents=True, exist_ok=True)
+    if a.tag is not None:
+        conf = dict(adsb=a.adsb, extra=a.extra, deice=a.deice, nn_missing=a.nn_missing, emb_cap=a.emb_cap,
+                    epochs=a.epochs, batch=a.batch)
+        cf = outdir / '_config.json'
+        if cf.exists():
+            old = json.load(open(cf))
+            diff = {k: (old.get(k), v) for k, v in conf.items() if old.get(k) != v}
+            if diff:
+                sys.exit(f'FATAL: {outdir.name} was started with other settings (old, new): {diff}')
+        else:
+            tmp = outdir / f'._config.{os.getpid()}.json'
+            json.dump(conf, open(tmp, 'w'), indent=1)
+            os.replace(tmp, cf)
     out = outdir / f'{a.family}__seed{a.seed:02d}.npy'
     if out.exists():
         print(f'{out} exists, skipping')
@@ -60,7 +82,7 @@ def main():
         print(f'device: {dev}', flush=True)
 
     t0 = time.time()
-    Xtr, mtr, Xrk, mrk, groups = assemble_w2_pair(adsb=a.adsb, extra=a.extra)
+    Xtr, mtr, Xrk, mrk, groups = assemble_w2_pair(adsb=a.adsb, extra=a.extra, deice=a.deice)
     cols, clf_cols = columns(groups)
     y_tr = mtr[TARGET].to_numpy()
     n_tr, n_rk = len(Xtr), len(Xrk)
@@ -89,7 +111,7 @@ def main():
         from prc.models.altfam import numeric_design
         from prc.models.embed_nn import fit_predict
         fit = trn & (np.nan_to_num(y, nan=np.inf) <= TAIL_CAP)
-        codes, cards, Z = numeric_design(X[cols], cols, fit_mask=fit, cats=W2_CATS)[:3]
+        codes, cards, Z = numeric_design(X[cols], cols, fit_mask=fit, missing=a.nn_missing, cats=W2_CATS)[:3]
         del X
         y_ext = np.nan_to_num(y, nan=0.0)
         pred = fit_predict(codes, Z, y_ext, fit, va, epochs=1 if a.smoke else a.epochs, batch=a.batch,

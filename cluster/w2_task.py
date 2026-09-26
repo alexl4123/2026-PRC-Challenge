@@ -10,13 +10,18 @@ Writes, per task:
   cache/cv/<campaign>/<family>__seed<NN>__m<MM>.npy        full mixture (exp66 format)
   cache/cv/<campaign>/<family>__seed<NN>__m<MM>.bulk.npy   the bulk regressor alone (not for
                                                            routed), for P-branch evaluation
-Idempotent: a task whose mixture file exists is skipped.
+Idempotent: a task whose mixture file exists is skipped. Each campaign folder carries a _config.json
+(feature flags + network settings); a task whose flags differ from it stops, so two configurations can
+never be mixed in one campaign.
+
+C1 (2026-09-26), the consolidated retrain: --adsb --extra --deice --nn-missing sentinel --campaign c1
 
   python cluster/w2_task.py --family perapt --seed 0 --month 7
   python cluster/w2_task.py --family nn --seed 0 --month 7 --device cuda
   python cluster/w2_task.py --family mix --seed 0 --month 7 --smoke     # laptop plumbing test
 """
 import argparse
+import json
 import os
 import sys
 import time
@@ -56,13 +61,29 @@ def main():
     ap.add_argument('--extra', action='store_true', help='A3 arm 2: + wake / backlog columns (cluster/w2_extra.py); use --campaign adsb2')
     ap.add_argument('--adsb', action='store_true',
                     help='add the adsb.lol columns (cache/adsb_lol/features_training.parquet); use --campaign adsb')
+    ap.add_argument('--deice', action='store_true',
+                    help='C1: + de-icing / disruption shares (cache/deice_0926/ind_training.parquet); use --campaign c1')
+    ap.add_argument('--nn-missing', default='median', choices=['median', 'sentinel'],
+                    help='nn only: NaN -> fold median (shipped so far) or -10 sentinel outside the +-8 clip (C1)')
     a = ap.parse_args()
 
-    if (a.adsb or a.extra) and a.campaign == 'w2':
-        sys.exit('FATAL: --adsb/--extra must not write into the w2 campaign; pass --campaign adsb / adsb2')
-    campaign = (('adsb' if a.adsb else 'w2') + ('2' if a.extra else '') + '_smoke') if a.smoke else a.campaign
+    if (a.adsb or a.extra or a.deice or a.nn_missing != 'median') and a.campaign == 'w2':
+        sys.exit('FATAL: --adsb/--extra/--deice/--nn-missing must not write into the w2 campaign')
+    campaign = a.campaign + '_smoke' if a.smoke else a.campaign
     outdir = CACHE / 'cv' / campaign
     outdir.mkdir(parents=True, exist_ok=True)
+    conf = dict(adsb=a.adsb, extra=a.extra, deice=a.deice, nn_missing=a.nn_missing, emb_cap=a.emb_cap,
+                epochs=a.epochs, batch=a.batch)
+    cf = outdir / '_config.json'
+    if cf.exists():
+        old = json.load(open(cf))
+        diff = {k: (old.get(k), v) for k, v in conf.items() if k in old and old[k] != v}
+        if diff:
+            sys.exit(f'FATAL: campaign {campaign} was started with other settings (old, new): {diff}')
+    elif a.campaign != 'w2' or a.smoke:
+        tmp = outdir / f'._config.{os.getpid()}.json'
+        json.dump(conf, open(tmp, 'w'), indent=1)
+        os.replace(tmp, cf)
     stem = f'{a.family}__seed{a.seed:02d}__m{a.month:02d}'
     out, out_bulk = outdir / f'{stem}.npy', outdir / f'{stem}.bulk.npy'
     if out.exists():
@@ -74,7 +95,7 @@ def main():
         print(f'device: {dev}', flush=True)
 
     t0 = time.time()
-    X, y, month, groups = assemble_w2(adsb=a.adsb, extra=a.extra)
+    X, y, month, groups = assemble_w2(adsb=a.adsb, extra=a.extra, deice=a.deice)
     cols, clf_cols = columns(groups)
     cats = [c for c in W2_CATS if c in cols]
     ccats = [c for c in CATS if c in clf_cols]
@@ -100,7 +121,7 @@ def main():
         bulk_trn = trn & (y <= TAIL_CAP)
         if a.family == 'nn':
             from prc.models.embed_nn import fit_predict
-            codes, cards, Z = numeric_design(X[cols], cols, fit_mask=bulk_trn, cats=W2_CATS)[:3]
+            codes, cards, Z = numeric_design(X[cols], cols, fit_mask=bulk_trn, missing=a.nn_missing, cats=W2_CATS)[:3]
             pb = np.clip(fit_predict(codes, Z, y, bulk_trn, va, epochs=1 if a.smoke else a.epochs,
                                      batch=a.batch, seed=a.seed, threads=a.threads, device=str(dev),
                                      emb_cap=a.emb_cap, log=lambda m: print(m, flush=True)), 0, None)
