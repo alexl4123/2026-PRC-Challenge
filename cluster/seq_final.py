@@ -49,13 +49,30 @@ def main():
     ap.add_argument('--deice', action='store_true', help='C1 feature set (+ de-icing shares) -> cache/seq_c1_final/')
     ap.add_argument('--smoke', action='store_true',
                     help='laptop plumbing test: 2 airports, 3%% of their training rows, K=16, 1 epoch')
+    ap.add_argument('--tag', default=None,
+                    help='output folder cache/<tag>_final/ -- REQUIRED for any non-default setting, so a variant can '
+                         'never be skipped into (or mixed with) the shipped cache/seq_final/')
     a = ap.parse_args()
+    nondefault = (a.epochs, a.batch, a.lr, a.K, a.window, a.d, a.layers) != (10, 4096, 2e-3, 64, 5400, 64, 2)
+    if nondefault and a.tag is None:
+        sys.exit('FATAL: non-default settings need --tag (e.g. --epochs 15 --tag seq_ep15)')
     fam = 'seqnc' if a.no_context else 'seq'
 
     check_inputs(REQUIRED + (['cache/deice_0926/ind_training.parquet', 'cache/deice_0926/ind_ranking.parquet']
                              if a.deice else []))
-    outdir = CACHE / (('seq_c1' if a.deice else 'seq') + ('_final_smoke' if a.smoke else '_final'))
+    base = a.tag or ('seq_c1' if a.deice else 'seq')
+    outdir = CACHE / (base + ('_final_smoke' if a.smoke else '_final'))
     outdir.mkdir(parents=True, exist_ok=True)
+    if a.tag is not None:                       # one configuration per tagged folder (as the fold campaigns)
+        import json
+        conf = dict(deice=a.deice, K=a.K, window=a.window, d=a.d, layers=a.layers, epochs=a.epochs, batch=a.batch, lr=a.lr)
+        cf = outdir / '_config.json'
+        if cf.exists():
+            diff = {k: (v0, conf[k]) for k, v0 in json.load(open(cf)).items() if k in conf and conf[k] != v0}
+            if diff:
+                sys.exit(f'FATAL: {outdir.name} was started with other settings (old, new): {diff}')
+        else:
+            json.dump(conf, open(cf, 'w'), indent=1)
     out = outdir / f'{fam}__seed{a.seed:02d}.npy'
     if out.exists():
         print(f'{out} exists, skipping')
