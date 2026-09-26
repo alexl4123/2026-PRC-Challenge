@@ -39,6 +39,8 @@ def main():
     ap.add_argument('--version', type=int, default=None)
     ap.add_argument('--check', action='store_true')
     ap.add_argument('--with-p-adsb', action='store_true')
+    ap.add_argument('--arm', default='adsb', choices=['adsb', 'adsb2'],
+                    help='adsb = arm 1 (ADS-B columns); adsb2 = arm 2 (+ wake / backlog / gap cap), judged against arm 1')
     a = ap.parse_args()
     if not a.check and a.version is None:
         sys.exit('pass --version N (explicit) or --check')
@@ -50,9 +52,11 @@ def main():
     if not np.array_equal(rk[ID].to_numpy(), ids):
         sys.exit('FATAL: ranking order differs from the components')
     D = rk['AOBT_3_flt'].isna().to_numpy()
-    OLDF, NEWF = CACHE / 'w2_final', (CACHE / 'w2_final' if a.check else CACHE / 'adsb_final')
+    OLDF, NEWF = CACHE / 'w2_final', (CACHE / 'w2_final' if a.check else CACHE / f'{a.arm}_final')
     Wold = json.load(open(CACHE / 'w2' / 'w3_weights.json'))
-    Wnew = Wold if a.check else json.load(open(CACHE / 'w2' / 'adsb_weights.json'))
+    Wnew = Wold if a.check else json.load(open(CACHE / 'w2' / f'{a.arm}_weights.json'))
+    if not a.check:
+        print(f'arm {a.arm}: finals {NEWF.name}, weights {a.arm}_weights.json (seeds {Wnew["seeds"]})')
     cache = {}
 
     def mem(folder, f):
@@ -86,7 +90,7 @@ def main():
         p14 = np.r_[t1['p_tabicl'].astype(float), t2['p_pool'].astype(float)]
         assert np.array_equal(np.sort(rows), np.flatnonzero(in_P)), 'TabICL p does not cover P exactly'
         pb_w2 = 0.5 * mem(OLDF, 'mix')[rows] + 0.5 * mem(OLDF, 'nn')[rows]
-        pb_ad = 0.5 * mem(CACHE / 'adsb_final', 'mix')[rows] + 0.5 * mem(CACHE / 'adsb_final', 'nn')[rows]
+        pb_ad = 0.5 * mem(NEWF, 'mix')[rows] + 0.5 * mem(NEWF, 'nn')[rows]
         mix = lambda pbm: np.clip(p14 * et[rows] + (1 - p14) * pbm, 0, None)
         delta[rows] = mix(pb_ad) - mix(pb_w2)
         print(f'P {len(rows):,} rows: mean shift {delta[rows].mean():+.2f} s, max {delta[rows].max():+.0f} / {delta[rows].min():+.0f}')
