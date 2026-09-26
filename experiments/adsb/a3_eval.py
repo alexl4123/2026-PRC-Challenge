@@ -124,8 +124,11 @@ def main():
         per = [r(f, month == m) - r(fo, month == m) for m in range(1, 13)]
         print(f'  {nm}: ' + '  '.join(out) + f'  months better {sum(v < 0 for v in per)}/12')
     gain = (y - fo) ** 2 - (y - fn) ** 2
-    top = np.sort(gain)[::-1][:100].sum() / max(gain.sum(), 1e-9)
-    print(f'\nshare of the SSE reduction carried by the 100 most-improved rows: {top:.2f}' + ('  <- FLAG' if top > 0.5 else ''))
+    if gain.sum() > 0:
+        top = np.sort(gain)[::-1][:100].sum() / gain.sum()
+        print(f'\nshare of the SSE reduction carried by the 100 most-improved rows: {top:.2f}' + ('  <- FLAG' if top > 0.5 else ''))
+    else:                                       # no net reduction: a share is undefined (was printed as ~1e17)
+        print('\nshare of the SSE reduction carried by the 100 most-improved rows: n/a (the new blend has no net SSE reduction)')
     print('per airport (all flights, 12 months): ' + '  '.join(
         f'{x} {r(fn, apt == x) - r(fo, apt == x):+.1f}' for x in sorted(set(apt))))
     json.dump({'members': FAMS, 'seeds': seeds, 'weights': Wn}, open(CACHE / 'w2' / f'{a.new}_weights.json', 'w'), indent=1)
