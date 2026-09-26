@@ -16,6 +16,11 @@ PRE-REGISTERED RULE (written 2026-09-26 BEFORE any seq fold exists; the project 
   R3  January AND July each improve on their own (point estimates);
   R4  >= 2 seq seeds are complete; the decision uses their mean, AND each seed alone also improves held-out;
   R5  the gain is not carried by < 100 rows: with the 100 most-improved rows removed, held-out and scored still < 0.
+SECOND ARM "LIRF-gated" (pre-registered 2026-09-26 by the main session, AFTER the laptop subset showed seq hurting
+LIRF (+8.5) but BEFORE any cluster seq fold exists): the 8-member blend everywhere except LIRF, whose rows keep the
+7-member blend (same weights as the primary arm, no refit). Judged by the same R1-R5 (R4: each seed's gated arm
+improves held-out). Decision: if both arms pass, ship the one with the better held-out point estimate; if only one
+passes, ship that one. Caveat: the gate was motivated by 2025 subset folds (Jan/Jul) that overlap the judging months.
 Also reported: per-airport deltas, months better /12, seq's NNLS weight, seq alone, the residual correlation of seq
 with each member, and the share of the gain carried by the top-100 rows.
 
@@ -174,6 +179,22 @@ def main():
           f'held-out {d100["held-out"]:+.2f}, scored {d100["scored"]:+.2f}')
     print('per airport (all flights, 12 months): ' + '  '.join(
         f'{x} {rmse(y[apt == x], fn[apt == x]) - rmse(y[apt == x], fo[apt == x]):+.2f}' for x in sorted(set(apt))))
+
+    rome_rows = apt == 'LIRF'
+    fg = np.where(rome_rows, fo, fn)
+    rg = {sc: block_boot(y[k], fg[k], fo[k], block[k]) for sc, k in
+          (('held-out', held), ('scored', S), ('Jan', month == 1), ('Jul', month == 7))}
+    per_g = [rmse(y[month == m], fg[month == m]) - rmse(y[month == m], fo[month == m]) for m in range(1, 13)]
+    print('\nLIRF-GATED ARM vs OLD (pre-registered second arm): ' + '  '.join(
+        f'{sc} {v[0]:+.2f} [{v[1]:+.2f},{v[2]:+.2f}]' for sc, v in rg.items()) + f'  months better {sum(v < 0 for v in per_g)}/12')
+    for s in seeds:
+        Ms = dict(M, seq=seq_s[s]); fs = np.where(rome_rows, fo, structure(Ms, weights(Ms, fams8), fams8))
+        print(f'  gated, seq seed {s} alone: held-out {rmse(y[held], fs[held]) - rmse(y[held], fo[held]):+.2f}  '
+              f'scored {rmse(y[S], fs[S]) - rmse(y[S], fo[S]):+.2f}')
+    gg = (y - fo) ** 2 - (y - fg) ** 2
+    topg = np.argsort(gg)[::-1][:100]; keepg = np.ones(len(y), bool); keepg[topg] = False
+    print('  gated without its 100 most-improved rows: ' + '  '.join(
+        f'{sc} {rmse(y[k & keepg], fg[k & keepg]) - rmse(y[k & keepg], fo[k & keepg]):+.2f}' for sc, k in (('held-out', held), ('scored', S))))
 
     info = None
     if all(complete(SEQ, 'seqnc', s_) for s_ in seeds):
