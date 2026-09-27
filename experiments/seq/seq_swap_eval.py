@@ -30,6 +30,9 @@ PRE-REGISTERED 2026-09-27 DECISION TREE for the 27 Sept cluster batch (v21 = 15 
   RESULT 09-27: A FAIL, B PASS -> v22 (20 epochs), live 245.1468 (-0.32 vs v21).
 PRE-REGISTERED 2026-09-27 13:1x UTC (before any 30-epoch fold exists): v22 = 20 epochs, seeds 0-2 is the reference.
   D  --old seqsw_ep20 --new seqsw_ep30 --ref swap_seqsw_ep20          (30 epochs, 3 vs 3 seeds, same rule R1-R5)
+  RESULT 09-27 evening: D PASS -> v23 (30 epochs), live 244.6576 (-0.49 vs v22).
+PRE-REGISTERED 2026-09-27 20:0x UTC (before any 40-epoch fold exists): v23 = 30 epochs, seeds 0-2 is the reference.
+  E  --old seqsw_ep30 --new seqsw_ep40 --ref swap_seqsw_ep30          (40 epochs, 3 vs 3 seeds, same rule R1-R5)
 
     python experiments/seq/seq_swap_eval.py --old seqsw_ep15 --new seqsw_ep15:0,1,2,3,4,5 --ref swap_seqsw_ep15
 """
