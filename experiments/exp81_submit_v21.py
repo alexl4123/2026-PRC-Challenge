@@ -13,6 +13,13 @@ Assembly (both parts from components, so no clip artefact can be carried forward
     python experiments/exp81_submit_v21.py --check identity   # seq = 10-epoch finals + shipped weights -> must equal v20
     python experiments/exp81_submit_v21.py --check v21        # change summary, no file written
     python experiments/exp81_submit_v21.py --version 21
+
+GENERALISED 2026-09-27 for v22 (seq at 20 epochs; experiments/seq/seq_swap_eval.py --old seqsw_ep15 --new seqsw_ep20
+PASSED, arm B of the pre-registered decision tree): --epochs N selects cache/seq_epN_final/ and cache/seq/swap_seqsw_epN.json;
+--prev V is the version the summary / rebuild compares with.
+    python experiments/exp81_submit_v21.py --epochs 15 --check rebuild --prev 21   # must equal the shipped v21 exactly
+    python experiments/exp81_submit_v21.py --epochs 20 --check v21 --prev 21       # v22 change summary vs v21
+    python experiments/exp81_submit_v21.py --epochs 20 --version 22
 """
 import argparse, json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -32,23 +39,25 @@ def fail(msg):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--version', type=int, default=None)
-    ap.add_argument('--check', choices=['identity', 'v21'], default=None)
+    ap.add_argument('--check', choices=['identity', 'v21', 'rebuild'], default=None)
     ap.add_argument('--overwrite', action='store_true')
+    ap.add_argument('--epochs', type=int, default=15, help='seq variant: cache/seq_ep<N>_final + swap_seqsw_ep<N>.json')
+    ap.add_argument('--prev', type=int, default=20, help='version to compare with (summary / rebuild)')
     a = ap.parse_args()
     if a.check is None and a.version is None:
         fail('pass --version N or --check identity|v21')
     ident = a.check == 'identity'
-    SEQF = CACHE / ('seq_final' if ident else 'seq_ep15_final')
+    SEQF = CACHE / ('seq_final' if ident else f'seq_ep{a.epochs}_final')
     if ident:
         W = json.load(open(CACHE / 'seq' / 'seq_eval_seq_adsb2_corr0.5.json'))['weights']
     else:
-        S = json.load(open(CACHE / 'seq' / 'swap_seqsw_ep15.json'))
+        S = json.load(open(CACHE / 'seq' / f'swap_seqsw_ep{a.epochs}.json'))
         if S['verdict'] != 'PASS' or not all(S['rule'].values()):
             fail(f'swap eval did not pass: {S["verdict"]}')
         W = S['weights_new']
         cf = json.load(open(SEQF / '_config.json'))
-        if cf.get('epochs') != 15:
-            fail(f'{SEQF} is not the 15-epoch run: {cf}')
+        if cf.get('epochs') != a.epochs:
+            fail(f'{SEQF} is not the {a.epochs}-epoch run: {cf}')
 
     c = np.load(CACHE / 'final' / 'lgb_components.npz', allow_pickle=True)
     ids, pt, et, in_P = c['ids'], c['pt'], c['et'], c['in_P'].astype(bool)
@@ -58,9 +67,9 @@ def main():
     D = rk['AOBT_3_flt'].isna().to_numpy()
     ABC, DnP = ~D & ~in_P, D & ~in_P
     shipped = lambda v: pd.read_parquet(OUTPUTS / f'{TEAM}_v{v}.parquet').set_index(ID)['TAXITIME_SEC_mvt'].reindex(ids).to_numpy().astype(float)
-    v19, v20 = shipped(19), shipped(20)
+    v19, v20 = shipped(19), shipped(a.prev if not ident else 20)
     if np.isnan(v19).any() or np.isnan(v20).any():
-        fail('v19 / v20 miss ranking ids')
+        fail('v19 / the comparison version miss ranking ids')
     if (v19[in_P] <= 0).any():
         fail('v19 has P rows at the 0 clip -- it cannot serve as the P base')
     z = np.load(CACHE / 'major' / 'm11f_candidates.npz', allow_pickle=True)
@@ -114,14 +123,19 @@ def main():
             print(f'{nm:16s} {g.sum():7,} rows: max |rebuild - v20| {dd.max():.0f} s, rows differing {int((dd > 0).sum())}')
         print('IDENTITY' if np.array_equal(new, v20) else 'NOT IDENTICAL', f'| peak RSS {peak_rss_gb():.2f} GB')
         return
+    if a.check == 'rebuild':
+        dd = np.abs(new - v20)
+        print(f'REBUILD of v{a.prev} with the {a.epochs}-epoch seq: rows differing {int((dd > 0).sum())}, max {dd.max():.0f} s -> '
+              + ('IDENTICAL' if np.array_equal(new, v20) else 'NOT IDENTICAL'))
+        return
     d = new - v20
     sq, sq10 = mem(SEQF, 'seq'), mem(CACHE / 'seq_final', 'seq')
     print('weights: ' + ' | '.join(f'{k}: ' + ' '.join(f'{f} {w:.3f}' for f, w in W[k].items() if w) for k in W))
-    print(f'seq 15-epoch finals: mean {sq.mean():.1f} median {np.median(sq):.1f} max {sq.max():.0f}; corr with the '
+    print(f'seq {a.epochs}-epoch finals: mean {sq.mean():.1f} median {np.median(sq):.1f} max {sq.max():.0f}; corr with the '
           f'10-epoch finals {np.corrcoef(sq, sq10)[0, 1]:.3f} (mean {sq10.mean():.1f})')
     ch = d != 0
-    print(f'rows changed vs v20: {int(ch.sum()):,} (A/B/C {int((ch & ABC).sum()):,}, D outside P {int((ch & DnP).sum()):,}, '
-          f'P {int((ch & in_P).sum()):,}); zeros v20 {int((v20 == 0).sum())} -> v21 {int((new == 0).sum())}')
+    print(f'rows changed vs v{a.prev}: {int(ch.sum()):,} (A/B/C {int((ch & ABC).sum()):,}, D outside P {int((ch & DnP).sum()):,}, '
+          f'P {int((ch & in_P).sum()):,}); zeros v{a.prev} {int((v20 == 0).sum())} -> new {int((new == 0).sum())}')
     for nm, g in (('A/B/C outside P', ABC), ('D outside P', DnP), ('P', in_P)):
         print(f'  {nm:16s}: mean shift {d[g].mean():+.2f} s, |shift| median {np.median(np.abs(d[g])):.0f}, '
               f'p99 {np.percentile(np.abs(d[g]), 99):.0f}, max {d[g].max():+.0f} / {d[g].min():+.0f}')
