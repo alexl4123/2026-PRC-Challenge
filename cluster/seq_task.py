@@ -77,6 +77,18 @@ def check_alignment(mv, off_sched, label):
     return dep
 
 
+
+def _read_conf(cf, tries=20):
+    """Read a campaign _config.json; retry briefly in case a parallel task is replacing it (2026-09-27 race)."""
+    import json, time
+    for i in range(tries):
+        try:
+            return json.load(open(cf))
+        except json.JSONDecodeError:
+            if i == tries - 1:
+                raise
+            time.sleep(0.5)
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--campaign', default='seq')
@@ -112,11 +124,13 @@ def main():
     conf = dict(deice=a.deice, K=a.K, window=a.window, d=a.d, layers=a.layers, epochs=a.epochs, batch=a.batch, lr=a.lr)
     cf = outdir / '_config.json'
     if cf.exists():
-        diff = {k: (v0, conf[k]) for k, v0 in json.load(open(cf)).items() if k in conf and conf[k] != v0}
+        diff = {k: (v0, conf[k]) for k, v0 in _read_conf(cf).items() if k in conf and conf[k] != v0}
         if diff:
             sys.exit(f'FATAL: campaign {campaign} was started with other settings (old, new): {diff}')
     else:
-        json.dump(conf, open(cf, 'w'), indent=1)
+        tmp = cf.with_name(f'._config.{os.getpid()}.json')   # atomic: parallel tasks never see a half-written file
+        json.dump(conf, open(tmp, 'w'), indent=1)
+        os.replace(tmp, cf)
     stem = f'{fam}__seed{a.seed:02d}__m{a.month:02d}'
     out, out_bulk = outdir / f'{stem}.npy', outdir / f'{stem}.bulk.npy'
     if out.exists():
