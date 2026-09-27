@@ -20,6 +20,10 @@ PASSED, arm B of the pre-registered decision tree): --epochs N selects cache/seq
     python experiments/exp81_submit_v21.py --epochs 15 --check rebuild --prev 21   # must equal the shipped v21 exactly
     python experiments/exp81_submit_v21.py --epochs 20 --check v21 --prev 21       # v22 change summary vs v21
     python experiments/exp81_submit_v21.py --epochs 20 --version 22
+--variant NAME (2026-09-27 overnight grid, e.g. ep60, ep40_d128) uses cache/seq_<NAME>_final/ and
+cache/seq/swap_seqsw_<NAME>.json instead, and requires the finals' _config.json to equal the fold campaign's
+(cache/cv/seqsw_<NAME>/_config.json) -- the ranking predictions come from exactly the settings that were judged.
+    python experiments/exp81_submit_v21.py --variant ep30 --check rebuild --prev 23   # must equal the shipped v23
 """
 import argparse, json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -43,20 +47,25 @@ def main():
     ap.add_argument('--overwrite', action='store_true')
     ap.add_argument('--epochs', type=int, default=15, help='seq variant: cache/seq_ep<N>_final + swap_seqsw_ep<N>.json')
     ap.add_argument('--prev', type=int, default=20, help='version to compare with (summary / rebuild)')
+    ap.add_argument('--variant', default=None, help='seq variant name (overrides --epochs): ep60, ep40_d128, ...')
     a = ap.parse_args()
+    name = a.variant or f'ep{a.epochs}'
     if a.check is None and a.version is None:
         fail('pass --version N or --check identity|v21')
     ident = a.check == 'identity'
-    SEQF = CACHE / ('seq_final' if ident else f'seq_ep{a.epochs}_final')
+    SEQF = CACHE / ('seq_final' if ident else f'seq_{name}_final')
     if ident:
         W = json.load(open(CACHE / 'seq' / 'seq_eval_seq_adsb2_corr0.5.json'))['weights']
     else:
-        S = json.load(open(CACHE / 'seq' / f'swap_seqsw_ep{a.epochs}.json'))
+        S = json.load(open(CACHE / 'seq' / f'swap_seqsw_{name}.json'))
         if S['verdict'] != 'PASS' or not all(S['rule'].values()):
             fail(f'swap eval did not pass: {S["verdict"]}')
         W = S['weights_new']
         cf = json.load(open(SEQF / '_config.json'))
-        if cf.get('epochs') != a.epochs:
+        cv = json.load(open(CACHE / 'cv' / f'seqsw_{name}' / '_config.json'))
+        if cf != cv:
+            fail(f'{SEQF.name} settings differ from the judged fold campaign seqsw_{name}: {cf} vs {cv}')
+        if a.variant is None and cf.get('epochs') != a.epochs:
             fail(f'{SEQF} is not the {a.epochs}-epoch run: {cf}')
 
     c = np.load(CACHE / 'final' / 'lgb_components.npz', allow_pickle=True)
@@ -125,13 +134,13 @@ def main():
         return
     if a.check == 'rebuild':
         dd = np.abs(new - v20)
-        print(f'REBUILD of v{a.prev} with the {a.epochs}-epoch seq: rows differing {int((dd > 0).sum())}, max {dd.max():.0f} s -> '
+        print(f'REBUILD of v{a.prev} with the {name} seq: rows differing {int((dd > 0).sum())}, max {dd.max():.0f} s -> '
               + ('IDENTICAL' if np.array_equal(new, v20) else 'NOT IDENTICAL'))
         return
     d = new - v20
     sq, sq10 = mem(SEQF, 'seq'), mem(CACHE / 'seq_final', 'seq')
     print('weights: ' + ' | '.join(f'{k}: ' + ' '.join(f'{f} {w:.3f}' for f, w in W[k].items() if w) for k in W))
-    print(f'seq {a.epochs}-epoch finals: mean {sq.mean():.1f} median {np.median(sq):.1f} max {sq.max():.0f}; corr with the '
+    print(f'seq {name} finals: mean {sq.mean():.1f} median {np.median(sq):.1f} max {sq.max():.0f}; corr with the '
           f'10-epoch finals {np.corrcoef(sq, sq10)[0, 1]:.3f} (mean {sq10.mean():.1f})')
     ch = d != 0
     print(f'rows changed vs v{a.prev}: {int(ch.sum()):,} (A/B/C {int((ch & ABC).sum()):,}, D outside P {int((ch & DnP).sum()):,}, '

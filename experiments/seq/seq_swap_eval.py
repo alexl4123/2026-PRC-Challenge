@@ -34,7 +34,16 @@ PRE-REGISTERED 2026-09-27 13:1x UTC (before any 30-epoch fold exists): v22 = 20 
 PRE-REGISTERED 2026-09-27 20:0x UTC (before any 40-epoch fold exists): v23 = 30 epochs, seeds 0-2 is the reference.
   E  --old seqsw_ep30 --new seqsw_ep40 --ref swap_seqsw_ep30          (40 epochs, 3 vs 3 seeds, same rule R1-R5)
   F  --old seqsw_ep30 --new seqsw_ep50 --ref swap_seqsw_ep30          (50 epochs, added 20:1x UTC, run in parallel with E)
-  Ship the passing arm (E or F) with the better held-out point estimate; neither passing -> keep v23.
+  (E/F tie-break superseded below, before any E/F fold had finished.)
+OVERNIGHT GRID, PRE-REGISTERED 2026-09-27 ~20:40 UTC (E/F just submitted, no fold of any arm finished; user: ~20 h of
+cluster time is fine). Every arm is judged against the SHIPPED v23 (seqsw_ep30, seeds 0-2) with R1-R5, 3 vs 3 seeds:
+  E ep40   F ep50   G ep60   H ep80                       (--new seqsw_ep40 / _ep50 / _ep60 / _ep80)
+  I ep40_d128   J ep50_d128   K ep40_l3   L ep40_lr3       (--new seqsw_ep40_d128 / ... ; width 128, 3 layers, lr 3e-3)
+  all with --old seqsw_ep30 --ref swap_seqsw_ep30.
+  SHIP the arm with the best held-out point estimate among those that PASS; none passing -> keep v23.
+  Reported, NOT decisive: equal-epoch capacity contrasts I vs E, K vs E, L vs E, J vs F (--old seqsw_ep40 / _ep50).
+  Multiplicity: 8 arms against one reference; the rule's block-bootstrap interval and per-seed consistency guard the
+  sign, but the chosen arm's point estimate is optimistic by selection -- expect the live gain below the offline number.
 
     python experiments/seq/seq_swap_eval.py --old seqsw_ep15 --new seqsw_ep15:0,1,2,3,4,5 --ref swap_seqsw_ep15
 """
