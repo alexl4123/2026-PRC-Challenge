@@ -16,6 +16,19 @@ only used the screening months 3/6/9/12, which are not judged here): adopt the v
   R5  with the 100 most-improved rows removed, held-out and scored still improve.
 
     python experiments/seq/seq_swap_eval.py --new seqsw_ep15
+
+GENERALISED 2026-09-27 (before any of the folds below existed): a side is a POOL "folder:s,s,...[+folder:s,...]"
+whose seq prediction is the plain mean over all listed (folder, seed) fits (a bare folder = seeds 0-2). R4 then reads:
+  - old and new each one folder with the same seeds -> per-seed pairing (as above);
+  - otherwise (the new pool adds fits)             -> the ADDED fits alone, as their own pool, are not worse than the
+    old pool by more than 0.10 s held-out (they are of the same quality; the gain is not a lucky subset).
+PRE-REGISTERED 2026-09-27 DECISION TREE for the 27 Sept cluster batch (v21 = 15 epochs, seeds 0-2, is the reference):
+  A  --old seqsw_ep15 --new seqsw_ep15:0,1,2,3,4,5                    (6 seeds instead of 3)
+  B  --old seqsw_ep15 --new seqsw_ep20                                (20 epochs, 3 vs 3 seeds)
+  C  --old seqsw_ep15 --new seqsw_ep15:0,1,2,3,4,5+seqsw_ep20:0,1,2   (pool of all 9) -- run only if A AND B pass
+  Ship the passing arm with the best held-out point estimate; none passing -> keep v21.
+
+    python experiments/seq/seq_swap_eval.py --old seqsw_ep15 --new seqsw_ep15:0,1,2,3,4,5 --ref swap_seqsw_ep15
 """
 import argparse, json, os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -42,14 +55,29 @@ def oof(folder, fam, seeds, month, suffix='.npy'):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--new', required=True, help='campaign folder of the variant under cache/cv/')
+    ap.add_argument('--new', required=True, help='pool spec "folder[:s,s,..][+folder[:s,..]]" under cache/cv/')
+    ap.add_argument('--old', default='seq', help='pool spec of the shipped side (default: the 10-epoch seq, seeds 0-2)')
+    ap.add_argument('--ref', default='seq_eval',
+                    help='weights the old side must reproduce: seq_eval (v19/v20) or swap_<name> (e.g. swap_seqsw_ep15 = v21)')
     a = ap.parse_args()
+
+    def spec(x):
+        out = []
+        for part in x.split('+'):
+            folder, _, seeds = part.partition(':')
+            out += [(folder, int(t)) for t in (seeds.split(',') if seeds else ['0', '1', '2'])]
+        return out
+    old_pairs, new_pairs = spec(a.old), spec(a.new)
+    name = a.new.replace(':', '_s').replace(',', '').replace('+', '__')
     b = np.load(CACHE / 'v11' / 'base.npz'); P, D, y, month = b['P'], b['D'], b['y'], b['month']
-    A2, SQ, NEW, W2 = CACHE / 'cv' / 'adsb2', CACHE / 'cv' / 'seq', CACHE / 'cv' / a.new, CACHE / 'cv' / 'w2'
-    miss = [(s, m) for s in range(3) for m in range(1, 13) if not (NEW / f'seq__seed{s:02d}__m{m:02d}.npy').exists()]
+    A2, W2 = CACHE / 'cv' / 'adsb2', CACHE / 'cv' / 'w2'
+    miss = [(f, s, m) for f, s in old_pairs + new_pairs for m in range(1, 13)
+            if not (CACHE / 'cv' / f / f'seq__seed{s:02d}__m{m:02d}.npy').exists()]
     if miss:
-        sys.exit(f'FATAL: {a.new} incomplete, {len(miss)} of 36 folds missing, e.g. {miss[:4]}')
-    print(f'variant settings: {json.load(open(NEW / "_config.json"))}')
+        sys.exit(f'FATAL: {len(miss)} folds missing, e.g. {miss[:4]}')
+    for f in sorted({f for f, _ in old_pairs + new_pairs}):
+        print(f'{f}: {json.load(open(CACHE / "cv" / f / "_config.json"))}')
+    print(f'old pool {old_pairs}\nnew pool {new_pairs}')
     M = {f: oof(A2, f, [0, 1, 2], month) for f in FAMS}
     v11 = np.load(CACHE / 'strategy' / 'v11s_oof.npy').astype(float)
     v9 = np.load(CACHE / 'major' / 'v9s_oof.npy').astype(float)
@@ -70,8 +98,11 @@ def main():
     fit = np.isin(month, SCREEN) & ~P
     fams8 = FAMS + ['seq']
 
-    def serve(folder, seeds):
-        Mx = dict(M, seq=oof(folder, 'seq', seeds, month))
+    def pool(pairs, suffix='.npy'):
+        return np.mean([oof(CACHE / 'cv' / f, 'seq', [s], month, suffix) for f, s in pairs], axis=0)
+
+    def serve(pairs):
+        Mx = dict(M, seq=pool(pairs))
         W = {}
         for key, g in (('routes A/B/C', ~D), ('route D', D)):
             w, _ = nnls(np.column_stack([Mx[f] for f in fams8])[fit & g], y[fit & g])
@@ -80,13 +111,14 @@ def main():
         for g, key in ((A, 'routes A/B/C'), (DnP, 'route D')):
             bl = sum(W[key][m] * Mx[m] for m in fams8)
             f[g] = np.clip(bl[g] + (0.5 * (v10 - v9)[g] if key == 'route D' else 0.0), 0, None)
-        pbP = 0.5 * w2mix + 0.5 * oof(folder, 'seq', seeds, month, '.bulk.npy')[Pidx]
+        pbP = 0.5 * w2mix + 0.5 * pool(pairs, '.bulk.npy')[Pidx]
         f[Pidx] = v11[Pidx] + (mixP(p14, pbP) - mixP(p_cur, pb_old))
         return f, W, Mx['seq']
 
-    fo, Wo, so_ = serve(SQ, [0, 1, 2])
-    fn, Wn, sn_ = serve(NEW, [0, 1, 2])
-    shipped = json.load(open(CACHE / 'seq' / 'seq_eval_seq_adsb2_corr0.5.json'))['weights']
+    fo, Wo, so_ = serve(old_pairs)
+    fn, Wn, sn_ = serve(new_pairs)
+    shipped = (json.load(open(CACHE / 'seq' / 'seq_eval_seq_adsb2_corr0.5.json'))['weights'] if a.ref == 'seq_eval'
+               else json.load(open(CACHE / 'seq' / f'{a.ref}.json'))['weights_new'])
     dw = max(abs(Wo[k][f] - shipped[k].get(f, 0.0)) for k in Wo for f in fams8)
     print(f'check: old-side weights vs shipped v19/v20 weights max |diff| {dw:.4f}' + ('  <- MISMATCH' if dw > 1e-3 else ''))
     print('new weights: ' + ' | '.join(f'{k}: ' + ' '.join(f'{f} {w:.3f}' for f, w in Wn[k].items() if w) for k in Wn))
@@ -101,8 +133,17 @@ def main():
     print('variant vs shipped seq, all flights, block bootstrap: ' + '  '.join(
         f'{sc} {v["point"]:+.3f} [{v["lo"]:+.3f},{v["hi"]:+.3f}]' for sc, v in res.items())
         + f'  months better {sum(v < 0 for v in per_m)}/12')
-    per_seed = {s: r(serve(NEW, [s])[0], held) - r(serve(SQ, [s])[0], held) for s in range(3)}
-    print('per seed held-out: ' + '  '.join(f'{s} {v:+.3f}' for s, v in per_seed.items()))
+    of, nf = {f for f, _ in old_pairs}, {f for f, _ in new_pairs}
+    paired = len(of) == 1 and len(nf) == 1 and [s for _, s in old_pairs] == [s for _, s in new_pairs]
+    if paired:
+        per_seed = {s: r(serve([new_pairs[i]])[0], held) - r(serve([old_pairs[i]])[0], held) for i, (_, s) in enumerate(old_pairs)}
+        print('per seed held-out: ' + '  '.join(f'{s} {v:+.3f}' for s, v in per_seed.items()))
+        r4 = all(v < 0 for v in per_seed.values())
+    else:
+        added = [q for q in new_pairs if q not in old_pairs]
+        per_seed = {'added_pool_vs_old': r(serve(added)[0], held) - r(fo, held)}
+        print(f'R4 (pool form): the {len(added)} added fits alone vs the old pool, held-out {per_seed["added_pool_vs_old"]:+.3f} (must be <= +0.10)')
+        r4 = per_seed['added_pool_vs_old'] <= 0.10
     gain = (y - fo) ** 2 - (y - fn) ** 2
     keep = np.ones(len(y), bool); keep[np.argsort(gain)[::-1][:100]] = False
     d100 = {sc: r(fn, k & keep) - r(fo, k & keep) for sc, k in (('held-out', held), ('scored', S))}
@@ -110,12 +151,12 @@ def main():
     print('per airport (all flights, 12 months): ' + '  '.join(
         f'{x} {r(fn, apt == x) - r(fo, apt == x):+.2f}' for x in sorted(set(apt))))
     R = dict(R1=res['held-out']['point'] < 0 and res['scored']['point'] < 0, R2=res['held-out']['hi'] < 0,
-             R3=res['Jan']['point'] < 0 and res['Jul']['point'] < 0, R4=all(v < 0 for v in per_seed.values()),
+             R3=res['Jan']['point'] < 0 and res['Jul']['point'] < 0, R4=r4,
              R5=d100['held-out'] < 0 and d100['scored'] < 0)
     verdict = 'PASS' if all(R.values()) else 'FAIL'
     print('RULE: ' + '  '.join(f'{k} {"ok" if v else "FAIL"}' for k, v in R.items()) + f'  => {verdict}')
-    json.dump({'new': a.new, 'weights_new': Wn, 'weights_old': Wo, 'rule': R, 'verdict': verdict, 'result': res,
-               'per_seed': per_seed, 'drop100': d100}, open(CACHE / 'seq' / f'swap_{a.new}.json', 'w'), indent=1)
+    json.dump({'new': a.new, 'old': a.old, 'weights_new': Wn, 'weights_old': Wo, 'rule': R, 'verdict': verdict, 'result': res,
+               'per_seed': per_seed, 'drop100': d100}, open(CACHE / 'seq' / f'swap_{name}.json', 'w'), indent=1)
 
 
 if __name__ == '__main__':
