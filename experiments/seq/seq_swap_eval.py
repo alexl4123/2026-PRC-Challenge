@@ -33,6 +33,8 @@ PRE-REGISTERED 2026-09-27 13:1x UTC (before any 30-epoch fold exists): v22 = 20 
   RESULT 09-27 evening: D PASS -> v23 (30 epochs), live 244.6576 (-0.49 vs v22).
 PRE-REGISTERED 2026-09-27 20:0x UTC (before any 40-epoch fold exists): v23 = 30 epochs, seeds 0-2 is the reference.
   E  --old seqsw_ep30 --new seqsw_ep40 --ref swap_seqsw_ep30          (40 epochs, 3 vs 3 seeds, same rule R1-R5)
+  F  --old seqsw_ep30 --new seqsw_ep50 --ref swap_seqsw_ep30          (50 epochs, added 20:1x UTC, run in parallel with E)
+  Ship the passing arm (E or F) with the better held-out point estimate; neither passing -> keep v23.
 
     python experiments/seq/seq_swap_eval.py --old seqsw_ep15 --new seqsw_ep15:0,1,2,3,4,5 --ref swap_seqsw_ep15
 """
