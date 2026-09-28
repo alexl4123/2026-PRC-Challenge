@@ -24,6 +24,10 @@ PASSED, arm B of the pre-registered decision tree): --epochs N selects cache/seq
 cache/seq/swap_seqsw_<NAME>.json instead, and requires the finals' _config.json to equal the fold campaign's
 (cache/cv/seqsw_<NAME>/_config.json) -- the ranking predictions come from exactly the settings that were judged.
     python experiments/exp81_submit_v21.py --variant ep30 --check rebuild --prev 23   # must equal the shipped v23
+--pool V1,V2,... (2026-09-28, post-hoc arm M): seq = the plain mean of all listed variants' finals (3 seeds each, equal
+weight per fit, exactly as seq_swap_eval pools the folds); weights from the pool's swap json; every finals folder must
+match its fold campaign's _config.json.
+    python experiments/exp81_submit_v21.py --pool ep30,ep40,ep50,ep60,ep80,ep40_d128,ep50_d128,ep40_l3,ep40_lr3 --version 24
 """
 import argparse, json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -48,8 +52,12 @@ def main():
     ap.add_argument('--epochs', type=int, default=15, help='seq variant: cache/seq_ep<N>_final + swap_seqsw_ep<N>.json')
     ap.add_argument('--prev', type=int, default=20, help='version to compare with (summary / rebuild)')
     ap.add_argument('--variant', default=None, help='seq variant name (overrides --epochs): ep60, ep40_d128, ...')
+    ap.add_argument('--pool', default=None, help='comma-separated variant names whose finals are averaged (arm M)')
     a = ap.parse_args()
+    pool = a.pool.split(',') if a.pool else None
     name = a.variant or f'ep{a.epochs}'
+    if pool:
+        name = '__'.join(f'seqsw_{v}' for v in pool)[len('seqsw_'):]      # swap json: swap_seqsw_<v1>__seqsw_<v2>...
     if a.check is None and a.version is None:
         fail('pass --version N or --check identity|v21')
     ident = a.check == 'identity'
@@ -61,11 +69,12 @@ def main():
         if S['verdict'] != 'PASS' or not all(S['rule'].values()):
             fail(f'swap eval did not pass: {S["verdict"]}')
         W = S['weights_new']
-        cf = json.load(open(SEQF / '_config.json'))
-        cv = json.load(open(CACHE / 'cv' / f'seqsw_{name}' / '_config.json'))
-        if cf != cv:
-            fail(f'{SEQF.name} settings differ from the judged fold campaign seqsw_{name}: {cf} vs {cv}')
-        if a.variant is None and cf.get('epochs') != a.epochs:
+        for v in (pool or [name]):
+            cf = json.load(open(CACHE / f'seq_{v}_final' / '_config.json'))
+            cv = json.load(open(CACHE / 'cv' / f'seqsw_{v}' / '_config.json'))
+            if cf != cv:
+                fail(f'seq_{v}_final settings differ from the judged fold campaign seqsw_{v}: {cf} vs {cv}')
+        if a.variant is None and pool is None and cf.get('epochs') != a.epochs:
             fail(f'{SEQF} is not the {a.epochs}-epoch run: {cf}')
 
     c = np.load(CACHE / 'final' / 'lgb_components.npz', allow_pickle=True)
@@ -99,7 +108,15 @@ def main():
             cache[(folder, f)] = np.mean([np.load(p).astype(float) for p in files], axis=0)
         return cache[(folder, f)]
 
-    fam = lambda f: mem(SEQF if f == 'seq' else FA, f)
+    seq_cache = {}
+
+    def seq_arr():                                  # the seq member's ranking prediction (one variant, or the pool)
+        if 'x' not in seq_cache:
+            seq_cache['x'] = (np.mean([mem(CACHE / f'seq_{v}_final', 'seq') for v in pool], axis=0) if pool
+                              else mem(SEQF, 'seq'))
+        return seq_cache['x']
+
+    fam = lambda f: seq_arr() if f == 'seq' else mem(FA, f)
 
     def blend(Wr):
         out = []
@@ -121,7 +138,7 @@ def main():
         fail('the TabICL probabilities do not cover the P rows exactly once')
     mix = lambda pb: np.clip(p14 * et[rows] + (1 - p14) * pb, 0, None)
     w2mix = mem(W2F, 'mix')[rows]
-    new[rows] = np.rint(np.clip(v19[rows] + mix(0.5 * w2mix + 0.5 * mem(SEQF, 'seq')[rows])
+    new[rows] = np.rint(np.clip(v19[rows] + mix(0.5 * w2mix + 0.5 * seq_arr()[rows])
                                 - mix(0.5 * w2mix + 0.5 * mem(W2F, 'nn')[rows]), 0, 200000))
     if np.isnan(new).any():
         fail('some rows were not assembled')
@@ -138,7 +155,7 @@ def main():
               + ('IDENTICAL' if np.array_equal(new, v20) else 'NOT IDENTICAL'))
         return
     d = new - v20
-    sq, sq10 = mem(SEQF, 'seq'), mem(CACHE / 'seq_final', 'seq')
+    sq, sq10 = seq_arr(), mem(CACHE / 'seq_final', 'seq')
     print('weights: ' + ' | '.join(f'{k}: ' + ' '.join(f'{f} {w:.3f}' for f, w in W[k].items() if w) for k in W))
     print(f'seq {name} finals: mean {sq.mean():.1f} median {np.median(sq):.1f} max {sq.max():.0f}; corr with the '
           f'10-epoch finals {np.corrcoef(sq, sq10)[0, 1]:.3f} (mean {sq10.mean():.1f})')
