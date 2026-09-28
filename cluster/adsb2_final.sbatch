@@ -15,6 +15,7 @@
 #
 # Writes cache/w2_final/<family>__seedNN.npy + ranking_ids.npy. Idempotent. Needs
 # cache/v11/feat_{training,ranking}.parquet on the cluster.
+# More seeds: sbatch --export=ALL,SEED_BASE=3 cluster/adsb2_final.sbatch   (seeds 3-5; default 0 = seeds 0-2)
 set -euo pipefail
 REPO="${SLURM_SUBMIT_DIR:-$PWD}"
 cd "$REPO"
@@ -25,7 +26,7 @@ done
 FAMS=(mix perapt lintree xgboost routed)
 i=$SLURM_ARRAY_TASK_ID
 FAM=${FAMS[$(( i / 3 ))]}
-SEED=$(( i % 3 ))
+SEED=$(( ${SEED_BASE:-0} + i % 3 ))      # SEED_BASE=3 -> seeds 3-5 (2026-09-28 member-seed batch)
 echo "task $i -> family $FAM seed $SEED"
 source "$HOME/miniconda3/etc/profile.d/conda.sh" 2>/dev/null \
     || source "$HOME/anaconda3/etc/profile.d/conda.sh"

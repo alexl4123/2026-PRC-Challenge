@@ -31,6 +31,8 @@ match its fold campaign's _config.json.
 --pool-seeds N (2026-09-28, arm N): each pooled variant contributes seeds 0..N-1 of its finals (default 3); the swap json
 is then the one seq_swap_eval writes for the spec "seqsw_<v>:0,..,N-1+...", i.e. swap_seqsw_<v1>_s0..N-1__seqsw_<v2>_s...
     python experiments/exp81_submit_v21.py --pool <same 9> --pool-seeds 6 --check v21 --prev 24
+--member-seeds 6 --weights-json members_s012345__seqS (2026-09-28, arm O): the 7 adsb2 members' finals use seeds 0-5 and the
+weights come from experiments/seq/member_seeds_eval.py (must be PASS).
 """
 import argparse, json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -57,6 +59,8 @@ def main():
     ap.add_argument('--variant', default=None, help='seq variant name (overrides --epochs): ep60, ep40_d128, ...')
     ap.add_argument('--pool', default=None, help='comma-separated variant names whose finals are averaged (arm M)')
     ap.add_argument('--pool-seeds', type=int, default=3, help='seeds 0..N-1 of each pooled variant (arm N: 6)')
+    ap.add_argument('--member-seeds', type=int, default=3, help='seeds 0..N-1 of the 7 adsb2 members (arm O: 6)')
+    ap.add_argument('--weights-json', default=None, help='cache/seq/<name>.json to take weights_new from (arm O: members_s012345__seqS)')
     a = ap.parse_args()
     pool = a.pool.split(',') if a.pool else None
     name = a.variant or f'ep{a.epochs}'
@@ -70,7 +74,7 @@ def main():
     if ident:
         W = json.load(open(CACHE / 'seq' / 'seq_eval_seq_adsb2_corr0.5.json'))['weights']
     else:
-        S = json.load(open(CACHE / 'seq' / f'swap_seqsw_{name}.json'))
+        S = json.load(open(CACHE / 'seq' / (f'{a.weights_json}.json' if a.weights_json else f'swap_seqsw_{name}.json')))
         if S['verdict'] != 'PASS' or not all(S['rule'].values()):
             fail(f'swap eval did not pass: {S["verdict"]}')
         W = S['weights_new']
@@ -121,7 +125,7 @@ def main():
                               else mem(SEQF, 'seq'))
         return seq_cache['x']
 
-    fam = lambda f: seq_arr() if f == 'seq' else mem(FA, f)
+    fam = lambda f: seq_arr() if f == 'seq' else mem(FA, f, a.member_seeds)
 
     def blend(Wr):
         out = []

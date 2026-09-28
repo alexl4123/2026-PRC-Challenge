@@ -12,6 +12,7 @@
 # W2 + adsb.lol columns (cluster/w2_final.py --adsb) -> cache/adsb2_final/. --gres=gpu:1 is MANDATORY.
 #
 #   sbatch --dependency=afterok:<stage-2 job> cluster/adsb2_final_nn.sbatch
+# More seeds: sbatch --export=ALL,SEED_BASE=3 cluster/adsb2_final_nn.sbatch   (seeds 3-5; default 0 = seeds 0-2)
 set -euo pipefail
 REPO="${SLURM_SUBMIT_DIR:-$PWD}"
 cd "$REPO"
@@ -22,7 +23,7 @@ done
 FAMS=(nn w3)
 i=$SLURM_ARRAY_TASK_ID
 FAM=${FAMS[$(( i / 3 ))]}
-SEED=$(( i % 3 ))
+SEED=$(( ${SEED_BASE:-0} + i % 3 ))      # SEED_BASE=3 -> seeds 3-5 (2026-09-28 member-seed batch)
 echo "task $i -> $FAM seed $SEED"
 source "$HOME/miniconda3/etc/profile.d/conda.sh" 2>/dev/null \
     || source "$HOME/anaconda3/etc/profile.d/conda.sh"
