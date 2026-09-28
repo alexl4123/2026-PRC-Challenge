@@ -48,6 +48,10 @@ POST-HOC ARM M (defined 2026-09-28 AFTER the grid results, BEFORE any pool resul
   the POOL of all 27 seq fits that exist (ep30 + the 8 grid variants, seeds 0-2 each, no variant picked), vs v23:
   --old seqsw_ep30 --new seqsw_ep30+seqsw_ep40+seqsw_ep50+seqsw_ep60+seqsw_ep80+seqsw_ep40_d128+seqsw_ep50_d128+seqsw_ep40_l3+seqsw_ep40_lr3
   same R1-R5 (R4 pool form: the 24 added fits alone within +0.10 s of v23's 3 fits). Shipping it needs the user's go.
+  RESULT 2026-09-28: M PASS (held-out -0.61, scored -0.65) -> v24, live 244.2213 (-0.44 vs v23).
+PRE-REGISTERED 2026-09-28 (before any seed-3..5 fit exists): ARM N = the pool of 54 fits (the 9 settings of M, seeds 0-5)
+  against v24 (the 27-fit pool of M), same R1-R5; R4 pool form = the 27 new fits alone within +0.10 s of v24's pool.
+  --old <M spec> --new <M spec with :0,1,2,3,4,5 on every folder> --ref swap_<M name>
   Multiplicity: 8 arms against one reference; the rule's block-bootstrap interval and per-seed consistency guard the
   sign, but the chosen arm's point estimate is optimistic by selection -- expect the live gain below the offline number.
 
