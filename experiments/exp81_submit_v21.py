@@ -28,6 +28,9 @@ cache/seq/swap_seqsw_<NAME>.json instead, and requires the finals' _config.json 
 weight per fit, exactly as seq_swap_eval pools the folds); weights from the pool's swap json; every finals folder must
 match its fold campaign's _config.json.
     python experiments/exp81_submit_v21.py --pool ep30,ep40,ep50,ep60,ep80,ep40_d128,ep50_d128,ep40_l3,ep40_lr3 --version 24
+--pool-seeds N (2026-09-28, arm N): each pooled variant contributes seeds 0..N-1 of its finals (default 3); the swap json
+is then the one seq_swap_eval writes for the spec "seqsw_<v>:0,..,N-1+...", i.e. swap_seqsw_<v1>_s0..N-1__seqsw_<v2>_s...
+    python experiments/exp81_submit_v21.py --pool <same 9> --pool-seeds 6 --check v21 --prev 24
 """
 import argparse, json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -53,11 +56,13 @@ def main():
     ap.add_argument('--prev', type=int, default=20, help='version to compare with (summary / rebuild)')
     ap.add_argument('--variant', default=None, help='seq variant name (overrides --epochs): ep60, ep40_d128, ...')
     ap.add_argument('--pool', default=None, help='comma-separated variant names whose finals are averaged (arm M)')
+    ap.add_argument('--pool-seeds', type=int, default=3, help='seeds 0..N-1 of each pooled variant (arm N: 6)')
     a = ap.parse_args()
     pool = a.pool.split(',') if a.pool else None
     name = a.variant or f'ep{a.epochs}'
     if pool:
-        name = '__'.join(f'seqsw_{v}' for v in pool)[len('seqsw_'):]      # swap json: swap_seqsw_<v1>__seqsw_<v2>...
+        tag = '' if a.pool_seeds == 3 else '_s' + ''.join(str(i) for i in range(a.pool_seeds))
+        name = '__'.join(f'seqsw_{v}{tag}' for v in pool)[len('seqsw_'):]   # swap json: swap_seqsw_<v1>[_s..]__seqsw_<v2>...
     if a.check is None and a.version is None:
         fail('pass --version N or --check identity|v21')
     ident = a.check == 'identity'
@@ -97,22 +102,22 @@ def main():
 
     cache = {}
 
-    def mem(folder, f):
-        if (folder, f) not in cache:
-            files = [folder / f'{f}__seed{s:02d}.npy' for s in range(3)]
+    def mem(folder, f, n=3):
+        if (folder, f, n) not in cache:
+            files = [folder / f'{f}__seed{s:02d}.npy' for s in range(n)]
             miss = [str(p) for p in files + [folder / 'ranking_ids.npy'] if not p.exists()]
             if miss:
                 fail(f'missing {miss}')
             if not np.array_equal(np.load(folder / 'ranking_ids.npy', allow_pickle=True), ids):
                 fail(f'{folder} is in a different ranking order')
-            cache[(folder, f)] = np.mean([np.load(p).astype(float) for p in files], axis=0)
-        return cache[(folder, f)]
+            cache[(folder, f, n)] = np.mean([np.load(p).astype(float) for p in files], axis=0)
+        return cache[(folder, f, n)]
 
     seq_cache = {}
 
     def seq_arr():                                  # the seq member's ranking prediction (one variant, or the pool)
         if 'x' not in seq_cache:
-            seq_cache['x'] = (np.mean([mem(CACHE / f'seq_{v}_final', 'seq') for v in pool], axis=0) if pool
+            seq_cache['x'] = (np.mean([mem(CACHE / f'seq_{v}_final', 'seq', a.pool_seeds) for v in pool], axis=0) if pool
                               else mem(SEQF, 'seq'))
         return seq_cache['x']
 
