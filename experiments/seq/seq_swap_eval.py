@@ -42,6 +42,12 @@ cluster time is fine). Every arm is judged against the SHIPPED v23 (seqsw_ep30, 
   all with --old seqsw_ep30 --ref swap_seqsw_ep30.
   SHIP the arm with the best held-out point estimate among those that PASS; none passing -> keep v23.
   Reported, NOT decisive: equal-epoch capacity contrasts I vs E, K vs E, L vs E, J vs F (--old seqsw_ep40 / _ep50).
+  RESULT 2026-09-28: ALL 8 FAIL (held-out ep40 +0.04, ep50 -0.08, ep60 -0.14, ep80 -0.22, d128@40 +0.02, d128@50 +0.10,
+  l3 +0.28, lr3 +0.14; every seed-consistency check fails; seq alone 222.1-222.5 vs ep30 221.9) -> keep v23.
+POST-HOC ARM M (defined 2026-09-28 AFTER the grid results, BEFORE any pool result was computed; flagged as post hoc):
+  the POOL of all 27 seq fits that exist (ep30 + the 8 grid variants, seeds 0-2 each, no variant picked), vs v23:
+  --old seqsw_ep30 --new seqsw_ep30+seqsw_ep40+seqsw_ep50+seqsw_ep60+seqsw_ep80+seqsw_ep40_d128+seqsw_ep50_d128+seqsw_ep40_l3+seqsw_ep40_lr3
+  same R1-R5 (R4 pool form: the 24 added fits alone within +0.10 s of v23's 3 fits). Shipping it needs the user's go.
   Multiplicity: 8 arms against one reference; the rule's block-bootstrap interval and per-seed consistency guard the
   sign, but the chosen arm's point estimate is optimistic by selection -- expect the live gain below the offline number.
 
