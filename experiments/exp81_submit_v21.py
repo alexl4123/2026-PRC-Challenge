@@ -33,6 +33,11 @@ is then the one seq_swap_eval writes for the spec "seqsw_<v>:0,..,N-1+...", i.e.
     python experiments/exp81_submit_v21.py --pool <same 9> --pool-seeds 6 --check v21 --prev 24
 --member-seeds 6 --weights-json members_s012345__seqS (2026-09-28, arm O): the 7 adsb2 members' finals use seeds 0-5 and the
 weights come from experiments/seq/member_seeds_eval.py (must be PASS).
+--arm-u U|UT (2026-10-02; experiments/seq/arm_u_eval.py, frozen gates, must be PASS): routes A/B/C outside P get
+per-bin weights, bins = terciles of the per-row sd across the 27 pool finals (fixed 2025 cut points); UT adds
+lambda_bin * (1 - p) * (seq10 - seqnc10) from cache/seq_final/ (seqnc finals needed). Route D / P as v24.
+Label-free gates checked here: 2026 A/B/C bin shares within 10 points of 33%, mean shift per airport x month in [-6, +6] s.
+    python experiments/exp81_submit_v21.py --pool <9> --arm-u U --check v21 --prev 24
 """
 import argparse, json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -60,6 +65,7 @@ def main():
     ap.add_argument('--pool', default=None, help='comma-separated variant names whose finals are averaged (arm M)')
     ap.add_argument('--pool-seeds', type=int, default=3, help='seeds 0..N-1 of each pooled variant (arm N: 6)')
     ap.add_argument('--member-seeds', type=int, default=3, help='seeds 0..N-1 of the 7 adsb2 members (arm O: 6)')
+    ap.add_argument('--arm-u', default=None, choices=['U', 'UT'], help='disagreement-tercile A/B/C weights (cache/seq/arm_u.json)')
     ap.add_argument('--weights-json', default=None, help='cache/seq/<name>.json to take weights_new from (arm O: members_s012345__seqS)')
     a = ap.parse_args()
     pool = a.pool.split(',') if a.pool else None
@@ -140,6 +146,29 @@ def main():
     new = np.full(len(ids), np.nan)
     new[ABC] = np.rint(np.clip(blend(W['routes A/B/C'])[ABC], 0, 200000))
     new[DnP] = np.rint(np.clip(blend(W['route D'])[DnP] + 0.5 * corr[DnP], 0, 200000))
+    gate_fail = []
+    if a.arm_u:
+        J = json.load(open(CACHE / 'seq' / 'arm_u.json'))
+        if J[a.arm_u]['verdict'] != 'PASS':
+            fail(f'arm {a.arm_u} did not pass its frozen gates')
+        POOLU = ['ep30', 'ep40', 'ep50', 'ep60', 'ep80', 'ep40_d128', 'ep50_d128', 'ep40_l3', 'ep40_lr3']
+        if pool != POOLU or a.pool_seeds != 3 or a.member_seeds != 3:
+            fail('--arm-u is defined on the 27-fit pool (9 settings x seeds 0-2) with members at seeds 0-2')
+        fits = np.array([np.load(CACHE / f'seq_{v}_final' / f'seq__seed{k:02d}.npy').astype(float) for v in POOLU for k in range(3)])
+        sdr = fits.std(0); del fits
+        bin_ = np.digitize(sdr, np.array(J['cuts']))
+        if a.arm_u == 'UT':
+            dlp = np.mean([(1 - pt[k]) for k in range(pt.shape[0])], axis=0) * (mem(CACHE / 'seq_final', 'seq') - mem(CACHE / 'seq_final', 'seqnc'))
+        shares = [float(np.mean(bin_[ABC] == c)) for c in (0, 1, 2)]
+        print(f'arm {a.arm_u}: cut points {J["cuts"]}, 2026 A/B/C bin shares ' + ' '.join(f'{x:.3f}' for x in shares))
+        if any(abs(x - 1 / 3) > 0.10 for x in shares):
+            gate_fail.append(f'bin shares {shares}')
+        for c in (0, 1, 2):
+            sel = ABC & (bin_ == c)
+            val = blend(J[a.arm_u]['weights'][str(c)])[sel]
+            if a.arm_u == 'UT':
+                val = val + J[a.arm_u]['lambdas'][str(c)] * dlp[sel]
+            new[sel] = np.rint(np.clip(val, 0, 200000))
     t1 = np.load(CACHE / 'strategy' / 'tfm_P_lirf_ranking.npz', allow_pickle=True)
     t2 = np.load(CACHE / 'tfm_w4' / 'pool_nonrome_ranking.npz', allow_pickle=True)
     rows = np.r_[t1['pos'], t2['pos']]; p14 = np.r_[t1['p_tabicl'].astype(float), t2['p_pool'].astype(float)]
@@ -175,7 +204,12 @@ def main():
         print(f'  {nm:16s}: mean shift {d[g].mean():+.2f} s, |shift| median {np.median(np.abs(d[g])):.0f}, '
               f'p99 {np.percentile(np.abs(d[g]), 99):.0f}, max {d[g].max():+.0f} / {d[g].min():+.0f}')
     t = pd.DataFrame({'apt': rk['APT'].astype(str).to_numpy(), 'month': rk['MVT_TIME_UTC_mvt'].dt.month.to_numpy(), 'd': d})
-    print(t.pivot_table(index='apt', columns='month', values='d', aggfunc='mean').round(2).to_string())
+    pv = t.pivot_table(index='apt', columns='month', values='d', aggfunc='mean')
+    print(pv.round(2).to_string())
+    if a.arm_u and (pv.abs().to_numpy() > 6).any():
+        gate_fail.append(f'airport x month mean shift beyond +-6 s: max {pv.abs().to_numpy().max():.2f}')
+    if gate_fail:
+        fail('label-free gate(s) failed: ' + '; '.join(gate_fail))
     if a.check:
         return
     out = OUTPUTS / f'{TEAM}_v{a.version}.parquet'
