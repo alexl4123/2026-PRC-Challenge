@@ -1,7 +1,7 @@
 """Blend-level member-seed gain 1 -> 3 seeds (seq pool fixed at 27 fits), to bound arm O (3 -> 6) by the
 variance model: MSE(3) - MSE(6) ~ (MSE(1) - MSE(3)) / 4. Read-only, no training."""
 import sys
-ROOT = '/home/thinklex/Dropbox/2025_phd/2026/35_PRC_Data_Challenge_OpenSky/00_src/prc2026'
+ROOT = __import__('os').path.dirname(__import__('os').path.dirname(__import__('os').path.dirname(__import__('os').path.abspath(__file__))))
 sys.path.insert(0, ROOT)
 import numpy as np
 from scipy.optimize import nnls

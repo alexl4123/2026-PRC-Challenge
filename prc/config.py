@@ -13,7 +13,7 @@ OUTPUTS = REPO / 'outputs'                        # gitignored: models, submissi
 for _p in (CACHE, OUTPUTS):
     _p.mkdir(exist_ok=True)
 
-PYTHON = '/home/thinklex/prc2026-venv/bin/python'  # system anaconda pyarrow 19 CANNOT read these files
+PYTHON = __import__('os').environ.get('PRC_PYTHON', __import__('sys').executable)  # laptop: /home/thinklex/prc2026-venv (system anaconda pyarrow 19 cannot read the files)
 
 AIRPORTS = ['EDDF', 'EDDM', 'EGLL', 'EHAM', 'LEBL', 'LEMD', 'LFPG', 'LIRF', 'LSZH', 'LTFM']
 

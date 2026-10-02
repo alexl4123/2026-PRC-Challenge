@@ -1,7 +1,7 @@
 """Build exp62 candidate features for P2 = route D & 1800 < off_sched <= 7200 (training + ranking),
 by calling prc.p_features.candidates with its population() swapped IN THIS PROCESS ONLY."""
 import sys, time
-sys.path.insert(0, '/home/thinklex/Dropbox/2025_phd/2026/35_PRC_Data_Challenge_OpenSky/00_src/prc2026')
+sys.path.insert(0, __import__('os').path.dirname(__import__('os').path.dirname(__import__('os').path.dirname(__import__('os').path.abspath(__file__)))))
 from common import *
 import pyarrow.parquet as pq
 import prc.p_features as pf

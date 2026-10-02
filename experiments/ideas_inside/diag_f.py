@@ -31,7 +31,7 @@ def feats(which):
     # 3. same-callsign INBOUND arrival? (arrival with same callsign-number is rare; skip) -> NM delay
     out['nm_delay'] = A3 - S
     return out, dapt, M, a_st, a_det, aapt, L
-import sys; sys.path.insert(0, '/home/thinklex/Dropbox/2025_phd/2026/35_PRC_Data_Challenge_OpenSky/00_src/prc2026')
+import sys; sys.path.insert(0, __import__('os').path.dirname(__import__('os').path.dirname(__import__('os').path.dirname(__import__('os').path.abspath(__file__)))))
 open(f'{D}/prc_prefix.py', 'w').write('from prc.p_features import prefix_of\n')
 res = {}
 for which in ['training', 'ranking']:

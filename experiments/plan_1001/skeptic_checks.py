@@ -7,7 +7,7 @@ B. Robustness of U (sd-tercile weights), U+T, and (d) airport-shrunk weights:
    B3 overlap: U + (d) combined vs each alone (standard fit on screening months).
 """
 import sys
-ROOT = '/home/thinklex/Dropbox/2025_phd/2026/35_PRC_Data_Challenge_OpenSky/00_src/prc2026'
+ROOT = __import__('os').path.dirname(__import__('os').path.dirname(__import__('os').path.dirname(__import__('os').path.abspath(__file__))))
 sys.path.insert(0, ROOT)
 import numpy as np, pandas as pd
 from scipy.optimize import nnls

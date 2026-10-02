@@ -1,7 +1,7 @@
 """Arm U per seed (R4-style): seed-s members + seed-s seq pool (9 fits) ; old = per-route NNLS, new = per route x
 tercile of the pool's per-row sd. Outside P only (P unchanged in both)."""
 import sys
-ROOT = '/home/thinklex/Dropbox/2025_phd/2026/35_PRC_Data_Challenge_OpenSky/00_src/prc2026'
+ROOT = __import__('os').path.dirname(__import__('os').path.dirname(__import__('os').path.dirname(__import__('os').path.abspath(__file__))))
 sys.path.insert(0, ROOT)
 import numpy as np
 from scipy.optimize import nnls

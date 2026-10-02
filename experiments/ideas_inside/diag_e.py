@@ -2,7 +2,7 @@
 probability mistake, (off_sched - pb)^2, and/or use the continuous mixing target.
 Replicates exp62 phase B (TE in-fold, same candidate cache); arms are PRE-REGISTERED below."""
 import sys, time
-sys.path.insert(0, '/home/thinklex/Dropbox/2025_phd/2026/35_PRC_Data_Challenge_OpenSky/00_src/prc2026')
+sys.path.insert(0, __import__('os').path.dirname(__import__('os').path.dirname(__import__('os').path.dirname(__import__('os').path.abspath(__file__)))))
 from common import *
 import lightgbm as lgb, pyarrow as pa, pyarrow.parquet as pq, pyarrow.compute as pc
 from prc.features import NEEDED, build as build_base, align_categories

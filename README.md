@@ -55,6 +55,16 @@ the desktop with it:
         systemd-inhibit --what=idle:sleep:handle-lid-switch \
         ~/prc2026-venv/bin/python experiments/expNN_....py
 
+## Building the submission
+
+The submission is assembled from stored model outputs by one script:
+
+    python assemble.py --arm-u U --check 26     # equivalence with the shipped v26
+    python assemble.py --arm-u U --out v27      # writes outputs/understanding-accordion_v27.parquet
+
+[docs/PIPELINE.md](docs/PIPELINE.md) is the runbook: which script and cluster job writes each
+component, the feature pipeline, the validation protocol, and every data source with its licence.
+
 ## Method notes
 
 The metric is dominated by a tiny tail: about 150 of 344,841 rows exceed two

@@ -1,7 +1,7 @@
 """Arm U+T: disagreement-tercile NNLS weights (U) plus lambda_(route,tercile) * (seq10 - seqnc10) fitted on the U residual
 on screening months. Info for bundling; no training."""
 import sys
-ROOT = '/home/thinklex/Dropbox/2025_phd/2026/35_PRC_Data_Challenge_OpenSky/00_src/prc2026'
+ROOT = __import__('os').path.dirname(__import__('os').path.dirname(__import__('os').path.dirname(__import__('os').path.abspath(__file__))))
 sys.path.insert(0, ROOT)
 import numpy as np, pandas as pd
 from scipy.optimize import nnls
