@@ -2,7 +2,7 @@
 
 **PRC Data Challenge 2026** · Team **understanding-accordion**
 
-<!-- AUTHORS: to be filled in by the team -->
+Author: Alexander Beiser (TU Wien), team understanding-accordion.
 
 This document explains what the submitted model is, why each part has its shape, and what evidence supports it. It
 describes **v28**, our best file on the public leaderboard (RMSE 235.3996, rank 21 of 232 on 2026-10-06), which is

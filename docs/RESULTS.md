@@ -2,7 +2,7 @@
 
 Team **understanding-accordion**, PRC Data Challenge 2026 (departure taxi-out time, 10 European airports).
 
-<!-- AUTHORS: to be filled in by the team -->
+Author: Alexander Beiser (TU Wien), team understanding-accordion.
 
 This file covers all 28 files we uploaded to the public leaderboard, from v1 (2026-09-21) to v28 (2026-10-06). For each
 upload it gives the change, the script that built it, the number of rows that moved, what our 2025 validation predicted

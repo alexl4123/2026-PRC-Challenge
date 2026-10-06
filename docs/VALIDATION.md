@@ -2,7 +2,7 @@
 
 Team **understanding-accordion**, PRC Data Challenge 2026 (taxi-out time of departures at ten European airports).
 
-<!-- AUTHORS: to be filled in by the team -->
+Author: Alexander Beiser (TU Wien), team understanding-accordion.
 
 This document covers five things:
 

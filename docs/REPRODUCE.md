@@ -1,7 +1,7 @@
 # Reproducing the submission
 
 Team **understanding-accordion**, PRC Data Challenge 2026 (taxi-out time at ten European airports).
-<!-- AUTHORS: to be filled in by the team -->
+Author: Alexander Beiser (TU Wien), team understanding-accordion.
 
 This document explains how to rebuild our final submission at three depths. The final submission is v28: public-leaderboard
 RMSE 235.3996, uploaded 2026-10-06. Its predecessors are rebuilt the same way. The runbook [PIPELINE.md](PIPELINE.md)

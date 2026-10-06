@@ -337,14 +337,19 @@ dated by when we recorded them; some were posted earlier in September.
 - **Judging January and July separately, and rejecting gains carried by fewer than 100 rows:** Piyush Patil, on the
   challenge Discord (2026-09-25). These became our gates R3 and R5.
 - **adsb.lol as a ground-movement source:** raised by participants on the challenge Discord (September 2026).
+- **Ideas from the challenge Discord that we tested but did not ship** (measured; see [docs/RESULTS.md](docs/RESULTS.md)):
+  - the carrier habit of copying the planned time into the off-block when there is no NM match, and a corrector on
+    out-of-fold predictions: Vudueprajacu (2026-09-28). The carrier rate improved Rome's zone-P classifier but not the
+    RMSE (the one upload that overrode our rule on it, v25, lost); the corrector failed our January <-> July cross-fit gate.
+  - making the submission's outliers resemble the training outliers: lbragado (September 2026); not adopted.
+  - an anchored target for the network member and a 2025-vs-2026 distribution check of new columns: Piyush Patil
+    (September 2026); measured, the parity check became part of our drift audit.
 - **Data and organisation:** the organisers of the PRC Data Challenge (EUROCONTROL's Performance Review Commission,
   with the OpenSky Network), the adsb.lol contributors, and the Iowa Environmental Mesonet.
 
 ## Authors
 
-Team understanding-accordion.
-
-<!-- AUTHORS: to be filled in by the team -->
+Team understanding-accordion: Alexander Beiser (TU Wien).
 
 ## Licence
 
