@@ -25,7 +25,30 @@ the rounding the old chain accumulated (measured 2026-10-02: |diff| <= 1.8 s on 
 
     python assemble.py --check 24                     # v24 design vs outputs/..._v24.parquet
     python assemble.py --arm-u U --check 26           # v26 design vs outputs/..._v26.parquet
-    python assemble.py --arm-u U --out v27            # write outputs/understanding-accordion_v27.parquet
+    python assemble.py --arm-u UT --check 27          # v27 (built with this script)
+    python assemble.py --arm-u UT --lobt-window --out v28
+
+LOBT WINDOW (--lobt-window, v28; header written 2026-10-06 BEFORE the build but AFTER the numbers below were measured).
+  Rule. In the 2025 training file every departure with an NM flight-plan match (LOBT_flt present: 2,062,577 rows, the same
+  rows that carry AOBT_3_flt) has its recorded off-block within +-3606 s of LOBT: BLOCK - LOBT in [-3606, +3606] with ZERO
+  exceptions, a sharp edge (215 rows in (3600, 3606], 45 in [-3606, -3600)), median +251 s. The extract's movement-to-flight
+  join evidently required |BLOCK - LOBT| <= 3606 s. This is a property of how the dataset was built (an artefact of the join),
+  not operational knowledge. Consequence for a row with LOBT: y = MVT - BLOCK lies in [MVT - LOBT - 3606, MVT - LOBT + 3606].
+  Transformation. After rint, every prediction p of a row with LOBT becomes
+      q = min(max(p, ceil(max(0, off_lobt - 3606))), floor(off_lobt + 3606)),   off_lobt = MVT - LOBT (s).
+  No row ids, no margin, no other change. In 2026 LOBT exists on exactly the 339,551 rows with AOBT_3 (routes A/B/C), so
+  route D and zone P never move. If the rule holds in 2026, every moved row's error can only shrink (projection onto an
+  interval that contains the truth).
+  Evidence (2025, in-sample for the rule): on the v24 OOF 236 rows change, 0 get worse; held-out -0.550 [-0.946, -0.239],
+  Jan+Jul -1.070 [-2.324, -0.308], 12/12 months better; ~79% of the gain sits in 10 rows (concentration disclosed; the
+  "not carried by 100 rows" check is vacuous for a change that cannot worsen any row).
+  2026 (label-free): 63 rows of v27 lie outside their window (60 below, 3 above); bound: RMSE <= 237.16 if the rule holds;
+  ~96% of the bound is one LIRF July row (v27 52,348 s, window [83,214, 90,426]). Label-free consistency 2025 vs 2026: LOBT
+  coverage 98.92% / 98.47%, MVT - LOBT > 3606 s on 2.22% / 2.11% of rows, min MVT - LOBT -3,382 / -3,173 s.
+  Credit. The idea was adopted on 2026-10-06 from public competitor repositories (EnioAguiar/prc-taxiout-2026,
+  javidmardanov/PRC-Data-Challenge-2026, joris-decombe/taxiout); the code here is our own. Competitors' leaderboard
+  statements are NOT used as evidence. Pre-commitment: upload once; no later upload changes a projected row; nobody derives
+  an implied label from the resulting score.
 """
 import argparse, json, sys
 from pathlib import Path
@@ -52,11 +75,12 @@ class Components:
     def __init__(self):
         c = np.load(CACHE / 'final' / 'lgb_components.npz', allow_pickle=True)
         self.ids, self.pt, self.et, self.in_P = c['ids'], c['pt'], c['et'], c['in_P'].astype(bool)
-        rk = load('ranking', phase='DEP', columns=[ID, 'AOBT_3_flt', 'APT', 'MVT_TIME_UTC_mvt', 'SCHED_TIME_UTC_mvt'])
+        rk = load('ranking', phase='DEP', columns=[ID, 'AOBT_3_flt', 'APT', 'MVT_TIME_UTC_mvt', 'SCHED_TIME_UTC_mvt', 'LOBT_flt'])
         if not np.array_equal(rk[ID].to_numpy(), self.ids):
             fail('ranking order differs from cache/final/lgb_components.npz')
         self.apt = rk.APT.astype(str).to_numpy(); self.month = rk.MVT_TIME_UTC_mvt.dt.month.to_numpy()
         self.off_sched = (rk.MVT_TIME_UTC_mvt - rk.SCHED_TIME_UTC_mvt).dt.total_seconds().to_numpy()
+        self.off_lobt = (rk.MVT_TIME_UTC_mvt - rk.LOBT_flt).dt.total_seconds().to_numpy()
         D = rk.AOBT_3_flt.isna().to_numpy()
         self.ABC, self.DnP = ~D & ~self.in_P, D & ~self.in_P
         z = np.load(CACHE / 'major' / 'm11f_candidates.npz', allow_pickle=True)
@@ -98,7 +122,28 @@ class Components:
         return np.mean(out, axis=0)
 
 
-def assemble(C, arm=None):
+WINDOW = 3606
+
+
+def lobt_selftest():
+    """The window must hold exactly on the 2025 training departures (guards against unit / timezone bugs)."""
+    d = load('training', phase='DEP', columns=['BLOCK_TIME_UTC_mvt', 'LOBT_flt'])
+    x = (d.BLOCK_TIME_UTC_mvt - d.LOBT_flt).dt.total_seconds().dropna().to_numpy()
+    if len(x) < 2_000_000 or np.abs(x).max() != WINDOW:
+        fail(f'LOBT self-test failed: {len(x):,} rows, max |BLOCK - LOBT| {np.abs(x).max():.0f} s (expected exactly {WINDOW})')
+    print(f'LOBT self-test: {len(x):,} training departures, max |BLOCK - LOBT| = {WINDOW} s, 0 outside -> OK')
+
+
+def lobt_window(C, pred):
+    m = np.isfinite(C.off_lobt)
+    if (m & ~C.ABC).any():
+        fail('LOBT present on a route-D or zone-P row -- the window design assumed A/B/C only')
+    lo = np.ceil(np.maximum(0.0, C.off_lobt[m] - WINDOW)); hi = np.floor(C.off_lobt[m] + WINDOW)
+    q = pred.copy(); q[m] = np.minimum(np.maximum(pred[m], lo), hi)
+    return q
+
+
+def assemble(C, arm=None, lobt=False):
     name = '__'.join(f'seqsw_{v}' for v in POOL)
     S = json.load(open(CACHE / 'seq' / f'swap_{name}.json'))
     if S['verdict'] != 'PASS':
@@ -128,7 +173,8 @@ def assemble(C, arm=None):
     pred[rows] = p * C.off_sched[rows] + (1 - p) * pb + C.corr[rows]
     if np.isnan(pred).any():
         fail('some rows were not assembled')
-    return np.rint(np.clip(pred, 0, HI))
+    out = np.rint(np.clip(pred, 0, HI))
+    return lobt_window(C, out) if lobt else out
 
 
 def shipped(C, v):
@@ -143,9 +189,12 @@ def main():
     ap.add_argument('--arm-u', default=None, choices=['U', 'UT'])
     ap.add_argument('--check', type=int, default=None, help='compare with outputs/..._v<N>.parquet')
     ap.add_argument('--out', default=None, help='write outputs/understanding-accordion_<out>.parquet (e.g. v27)')
+    ap.add_argument('--lobt-window', action='store_true', help='project A/B/C predictions into the LOBT +-3606 s window (v28)')
     a = ap.parse_args()
     C = Components()
-    new = assemble(C, a.arm_u)
+    if a.lobt_window:
+        lobt_selftest()
+    new = assemble(C, a.arm_u, a.lobt_window)
     if a.check is not None:
         old = shipped(C, a.check)
         for nm, g, tol in (('A/B/C outside P', C.ABC, 0.0), ('D outside P', C.DnP, 0.0), ('zone P', C.in_P, 2.0)):
