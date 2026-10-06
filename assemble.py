@@ -49,6 +49,27 @@ LOBT WINDOW (--lobt-window, v28; header written 2026-10-06 BEFORE the build but 
   javidmardanov/PRC-Data-Challenge-2026, joris-decombe/taxiout); the code here is our own. Competitors' leaderboard
   statements are NOT used as evidence. Pre-commitment: upload once; no later upload changes a projected row; nobody derives
   an implied label from the resulting score.
+
+JOIN COMPLEMENT + SOURCE CAP (--join-complement, v29; header written 2026-10-06 BEFORE the build, AFTER the rules were
+discovered and measured on 2025 by the 10-06 structure hunt -- not pre-registered in the strict sense; disclosed as such).
+  Clean link. For a departure d WITHOUT LOBT, IFR, ADES != own airport: the arrival r (same file, ARR phase) with the
+  smallest MVT_r - MVT_d in (0, 86400) s, APT_r = ADES_d, ADEP_r = APT_d, FLIGHT_d == FLIGHT_r or FLIGHT_d == CALLSIGN_r,
+  LOBT present on r, and r's FLIGHT_ID appearing on no departure row. lo/hi = (MVT_d - LOBT_r) -+ 3606.
+  A (join complement). d carries no NM record although its flight's NM record exists on the arrival side, so d's own join
+    failed: |BLOCK_d - LOBT_r| > 3606 (2025: 0 exceptions on 1,426 clean links). Where lo < -12 (y below lo impossible,
+    min recorded y is -12), y > hi: q = max(p, ceil(hi)).  2025: 70/70 one-sided rows above hi.
+  B' (two-sided, lower side). Where lo >= -12, (MVT_d - SCHED_d) lies in [lo, hi] (a block stamped at the schedule would
+    have joined) and the take-off does not cross local midnight relative to the schedule (dloc <= 0, guarding Rome's
+    day-shift class): q = min(p, floor(max(lo, 0))).  EMPIRICAL: 2025 1,296/1,296 below lo, 0 above hi -- not a forced
+    identity.
+  C (source cap). LEBL and LEMD record no departure taxi above 3,606 s (2025: 0 of 391,947; max 3,604 / 3,598; other
+    airports exceed it; 2026 arrivals at LEBL/LEMD also stay <= 3,606): q = min(q, 3606).
+  Order: v28 (incl. the LOBT window) -> A -> B' -> C. Must not move any of the 63 rows the LOBT window projected (asserted).
+  2026 label-free checks (abort if violated): clean-link share of IFR no-LOBT departures in [5%, 10%]; arrival NM coverage
+  >= 99%; no moved row on an airport-day whose IFR no-LOBT share exceeds 17.2% (2025 max).  Expected: 36 rows move
+  (9 up by A, 21 down by B', 6 down by C); bound if the rules hold: <= 235.023 from v28's 235.3996 (label-free moves).
+  ~60% of the squared moves sit on one Rome row. Pre-commitment: upload once, score logged only, no implied label, no later
+  upload changes these rows.
 """
 import argparse, json, sys
 from pathlib import Path
@@ -143,7 +164,103 @@ def lobt_window(C, pred):
     return q
 
 
-def assemble(C, arm=None, lobt=False):
+TZ = {'EDDF': 'Europe/Berlin', 'EDDM': 'Europe/Berlin', 'EGLL': 'Europe/London', 'EHAM': 'Europe/Amsterdam',
+      'LEBL': 'Europe/Madrid', 'LEMD': 'Europe/Madrid', 'LFPG': 'Europe/Paris', 'LIRF': 'Europe/Rome', 'LSZH': 'Europe/Zurich',
+      'LTFM': 'Europe/Istanbul'}
+CAP_APTS, CAP = ('LEBL', 'LEMD'), 3606
+JC_COLS = ['MVT_ID_mvt', 'FLIGHT_ID_mvt', 'FLIGHT_mvt', 'FLIGHT_RULE_mvt', 'ADEP_mvt', 'ADES_mvt', 'PHASE_mvt', 'MVT_TIME_UTC_mvt',
+           'SCHED_TIME_UTC_mvt', 'LOBT_flt', 'CALLSIGN_flt', 'APT']
+
+
+def _secs(x):
+    return (x - pd.Timestamp('1970-01-01', tz='UTC')).dt.total_seconds().to_numpy()
+
+
+def clean_links(which):
+    """Departure rows (DEP order of `which`) with a clean link -> (row index, lo, hi, off_sched, dloc)."""
+    f = load(which, columns=JC_COLS + (['BLOCK_TIME_UTC_mvt'] if which == 'training' else []))
+    dep = f[f.PHASE_mvt.eq('DEP')].reset_index(drop=True); arr = f[f.PHASE_mvt.eq('ARR')].reset_index(drop=True)
+    for x in (dep, arr):
+        for c in ('APT', 'FLIGHT_mvt', 'ADEP_mvt', 'ADES_mvt', 'CALLSIGN_flt'):
+            x[c] = x[c].astype(str)
+    dep['i'] = np.arange(len(dep))
+    used = set(dep.FLIGHT_ID_mvt.dropna().unique())
+    D = dep[dep.LOBT_flt.isna() & dep.FLIGHT_RULE_mvt.astype(str).eq('I') & (dep.APT != dep.ADES_mvt)].copy()
+    D['MVT'] = _secs(D.MVT_TIME_UTC_mvt); D['SCHED'] = _secs(D.SCHED_TIME_UTC_mvt)
+    R = arr[arr.LOBT_flt.notna() & ~arr.FLIGHT_ID_mvt.isin(used)].copy()
+    R = pd.DataFrame({'a_FLIGHT_mvt': R.FLIGHT_mvt, 'a_CALLSIGN_flt': R.CALLSIGN_flt, 'a_ADEP_mvt': R.ADEP_mvt, 'a_APT': R.APT,
+                      'a_MVT': _secs(R.MVT_TIME_UTC_mvt), 'a_LOBT': _secs(R.LOBT_flt)})
+    L = []
+    for key in ('a_FLIGHT_mvt', 'a_CALLSIGN_flt'):
+        m = D.merge(R, left_on=['FLIGHT_mvt', 'APT', 'ADES_mvt'], right_on=[key, 'a_ADEP_mvt', 'a_APT'])
+        m['t'] = m.a_MVT - m.MVT; L.append(m[(m.t > 0) & (m.t < 86400)])
+    m = pd.concat(L).sort_values('t').drop_duplicates('i').reset_index(drop=True)
+    off = (m.MVT - m.a_LOBT).to_numpy()
+    dloc = np.zeros(len(m), int)
+    for a, z in TZ.items():
+        k = (m.APT == a).to_numpy()
+        if k.any():
+            mv = pd.to_datetime(m.MVT[k] - 900, unit='s', utc=True).dt.tz_convert(z).dt.tz_localize(None).dt.normalize()
+            sc = pd.to_datetime(m.SCHED[k], unit='s', utc=True).dt.tz_convert(z).dt.tz_localize(None).dt.normalize()
+            dloc[k] = (mv - sc).dt.days.to_numpy()
+    out = dict(i=m.i.to_numpy(), lo=off - WINDOW, hi=off + WINDOW, off_sched=(m.MVT - m.SCHED).to_numpy(), dloc=dloc,
+               n_ifr_nolobt=len(D), dep=dep)
+    if which == 'training':
+        out['y'] = (m.MVT - _secs(m.BLOCK_TIME_UTC_mvt)).to_numpy()
+    return out
+
+
+def jc_selftest():
+    """Re-run the 2025 premises of A, B' and C on the training file; abort if any exception appears."""
+    L = clean_links('training'); y, lo, hi = L['y'], L['lo'], L['hi']
+    inside = (y >= lo) & (y <= hi)
+    one = lo < -12; b = ~one & (L['off_sched'] >= lo) & (L['off_sched'] <= hi) & (L['dloc'] <= 0)
+    d = load('training', phase='DEP', columns=['APT', 'MVT_TIME_UTC_mvt', 'BLOCK_TIME_UTC_mvt'])
+    yd = (d.MVT_TIME_UTC_mvt - d.BLOCK_TIME_UTC_mvt).dt.total_seconds().to_numpy()
+    cap_viol = int((yd[d.APT.astype(str).isin(CAP_APTS).to_numpy()] > CAP).sum())
+    msg = (f'join-complement self-test (2025): clean links {len(y):,}, inside +-3606 {int(inside.sum())}; one-sided {int(one.sum())}, '
+           f'below hi {int((y[one] <= hi[one]).sum())}; B\' rows {int(b.sum())}, above lo {int((y[b] >= lo[b]).sum())}; '
+           f'LEBL/LEMD above {CAP}: {cap_viol}')
+    if inside.any() or (y[one] <= hi[one]).any() or (y[b] >= lo[b]).any() or cap_viol or len(y) < 1000:
+        fail(msg)
+    print(msg + ' -> OK')
+
+
+def join_complement(C, pred, before_window):
+    """Apply A, B' and C to the v28 prediction (after the LOBT window)."""
+    L = clean_links('ranking'); dep = L['dep']
+    if not np.array_equal(dep.MVT_ID_mvt.to_numpy(), C.ids):
+        fail('ranking DEP order differs from the components')
+    i, lo, hi, osd, dloc = L['i'], L['lo'], L['hi'], L['off_sched'], L['dloc']
+    share = len(i) / max(L['n_ifr_nolobt'], 1)
+    arr = load('ranking', phase='ARR', columns=['LOBT_flt', 'FLIGHT_RULE_mvt'])
+    cov = arr[arr.FLIGHT_RULE_mvt.astype(str).eq('I')].LOBT_flt.notna().mean()
+    q = pred.copy()
+    one = lo < -12
+    q[i[one]] = np.maximum(q[i[one]], np.ceil(hi[one]))
+    b = ~one & (osd >= lo) & (osd <= hi) & (dloc <= 0)
+    q[i[b]] = np.minimum(q[i[b]], np.floor(np.maximum(lo[b], 0)))
+    cap = np.isin(C.apt, CAP_APTS)
+    m = np.isfinite(C.off_lobt) & cap
+    if (np.ceil(np.maximum(0.0, C.off_lobt[m] - WINDOW)) > CAP).any():
+        fail('the LEBL/LEMD cap conflicts with a LOBT window lower edge')
+    q[cap] = np.minimum(q[cap], CAP)
+    moved = q != pred
+    if (moved & (before_window != pred)).any():
+        fail('the join complement would move a row the LOBT window projected (pre-commitment)')
+    day = pd.to_datetime(dep.MVT_TIME_UTC_mvt).dt.strftime('%Y-%m-%d').to_numpy()
+    ifr_nolobt = (dep.LOBT_flt.isna() & dep.FLIGHT_RULE_mvt.astype(str).eq('I')).to_numpy()
+    sh = pd.Series(ifr_nolobt).groupby([dep.APT.to_numpy(), day]).mean()
+    worst = max((sh.get((a, dd), 0.0) for a, dd in zip(dep.APT.to_numpy()[moved], day[moved])), default=0.0)
+    print(f'join complement 2026: clean links {len(i)} ({share:.1%} of {L["n_ifr_nolobt"]:,} IFR no-LOBT deps), arrival IFR NM coverage '
+          f'{cov:.2%}; moved: A {int((q[i[one]] != pred[i[one]]).sum())}, B\' {int((q[i[b]] != pred[i[b]]).sum())}, '
+          f'C {int((cap & moved).sum())}; total {int(moved.sum())}; worst airport-day IFR no-LOBT share among moved rows {worst:.1%}')
+    if not (0.05 <= share <= 0.10) or cov < 0.99 or worst > 0.172:
+        fail('a 2026 label-free consistency check failed')
+    return q
+
+
+def assemble(C, arm=None, lobt=False, jc=False):
     name = '__'.join(f'seqsw_{v}' for v in POOL)
     S = json.load(open(CACHE / 'seq' / f'swap_{name}.json'))
     if S['verdict'] != 'PASS':
@@ -174,7 +291,10 @@ def assemble(C, arm=None, lobt=False):
     if np.isnan(pred).any():
         fail('some rows were not assembled')
     out = np.rint(np.clip(pred, 0, HI))
-    return lobt_window(C, out) if lobt else out
+    if not lobt:
+        return out
+    win = lobt_window(C, out)
+    return join_complement(C, win, out) if jc else win
 
 
 def shipped(C, v):
@@ -190,11 +310,16 @@ def main():
     ap.add_argument('--check', type=int, default=None, help='compare with outputs/..._v<N>.parquet')
     ap.add_argument('--out', default=None, help='write outputs/understanding-accordion_<out>.parquet (e.g. v27)')
     ap.add_argument('--lobt-window', action='store_true', help='project A/B/C predictions into the LOBT +-3606 s window (v28)')
+    ap.add_argument('--join-complement', action='store_true', help="v29: join-complement rules A, B' and the LEBL/LEMD cap C (needs --lobt-window)")
     a = ap.parse_args()
     C = Components()
     if a.lobt_window:
         lobt_selftest()
-    new = assemble(C, a.arm_u, a.lobt_window)
+    if a.join_complement:
+        if not a.lobt_window:
+            fail('--join-complement is defined on top of --lobt-window')
+        jc_selftest()
+    new = assemble(C, a.arm_u, a.lobt_window, a.join_complement)
     if a.check is not None:
         old = shipped(C, a.check)
         for nm, g, tol in (('A/B/C outside P', C.ABC, 0.0), ('D outside P', C.DnP, 0.0), ('zone P', C.in_P, 2.0)):
