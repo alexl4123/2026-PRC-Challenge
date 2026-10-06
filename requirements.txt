@@ -1,0 +1,52 @@
+# Python environment of team understanding-accordion, PRC Data Challenge 2026.
+#
+# These are the versions of the laptop environment that built and checked the shipped files v24-v28
+# (CPython 3.12.3 on Ubuntu 24.04; `pip freeze` taken 2026-10-06). Install with
+#     python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
+# The cluster environments (cluster/setup_env.sh for CPU jobs, cluster/setup_env_gpu.sh for GPU jobs) were
+# created with unpinned `pip install` in September 2026; their exact versions were not recorded.
+# See docs/REPRODUCE.md for what each reproduction level needs.
+
+# --- core -----------------------------------------------------------------------------------------------
+numpy==2.5.3
+pandas==3.0.6
+# pyarrow >= 20 is REQUIRED: older versions fail on the challenge parquet files with
+# "Repetition level histogram size mismatch". 25.0.1 also wrote the shipped submission files.
+pyarrow==25.0.1
+scipy==1.18.1
+scikit-learn==1.9.1
+
+# --- gradient-boosting members ---------------------------------------------------------------------------
+lightgbm==4.7.0
+xgboost==3.4.1
+
+# --- neural members and the neighbour-context sequence model ---------------------------------------------
+# The laptop has the CPU build (2.14.0+cpu, index https://download.pytorch.org/whl/cpu); `==2.14.0` matches it.
+# The cluster GPU environment took torch from https://download.pytorch.org/whl/cu124 (NVIDIA L40S, sm_89).
+torch==2.14.0
+
+# --- zone-P tail classifier (TabICL, BSD-3-Clause) --------------------------------------------------------
+# Checkpoint: Hugging Face jingang/TabICL, file tabicl-classifier-v2-20260212.ckpt (see docs/REPRODUCE.md).
+# transformers 5.x is pinned on purpose: transformers < 5 would downgrade huggingface_hub to 0.36.
+tabicl==2.2.0
+transformers==5.17.0
+huggingface_hub==1.33.0
+
+# --- reading the EUROCONTROL ATFM workbook (docs/REPRODUCE.md, "ATFM daily delays") -----------------------
+openpyxl==3.1.5
+
+# --- figures in experiments/ -----------------------------------------------------------------------------
+matplotlib==3.11.2
+
+# --- upload of submission files to the team's S3 bucket (prc/s3.py); not needed to reproduce anything -----
+boto3==1.43.98
+
+# --- NOT part of the laptop environment; install only if you need the script named -----------------------
+# experiments/strategy/s21_tfm_P_final.py imports TabPFN unconditionally (it was run with TabPFN 9.0.0
+# installed outside this environment, TabPFN v2 weights, Prior Labs License 1.1). Its TabPFN output
+# (p_tabpfn) is NOT used by assemble.py; only its TabICL output (p_tabicl) is. Three exploratory TabPFN
+# screens under experiments/strategy/ need it as well.
+# tabpfn==9.0.0
+# CatBoost is used by cluster/study_task.py (an early model-family study) and four exploratory scripts
+# (experiments/exp42, exp43, exp45, exp48); the shipped blend contains no CatBoost model.
+# catboost==1.2.10

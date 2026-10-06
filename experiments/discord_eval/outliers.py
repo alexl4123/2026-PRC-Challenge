@@ -1,5 +1,5 @@
-"""Idea 10 (lbragado, Discord l.689): "force the submission's outliers to look like the training
-outliers". Concrete, label-free-at-serving readings, priced on the v15-structure 2025 OOF
+"""Idea 10 (a participant's suggestion on the challenge Discord): make the submission's outliers resemble
+the training outliers. Concrete, label-free-at-serving readings, priced on the v15-structure 2025 OOF
 (leave-one-month-out: the held-out month's own predictions + the OTHER months' labels only):
 
   QM_full(q0=0)   per airport, map each held-out prediction's within-month rank to the training

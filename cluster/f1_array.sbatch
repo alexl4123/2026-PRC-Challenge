@@ -25,7 +25,7 @@
 # Idempotent: finished (variant, month, seed) parts in cache/tfm_f1/parts/ are skipped,
 # so a failed task can simply be resubmitted with --array=<its index>.
 # Pull the parts back and build the report on the laptop:
-#   rsync -az vivaldi:03_2026_PRC_Challenge/2026-PRC-Challenge/cache/tfm_f1/parts/ \
+#   rsync -az cluster:<repo>/cache/tfm_f1/parts/ \
 #         <laptop repo>/cache/tfm_f1/parts/
 #   python experiments/tfm/f1_finetune_rome.py --report --seeds 0 1 2
 set -euo pipefail

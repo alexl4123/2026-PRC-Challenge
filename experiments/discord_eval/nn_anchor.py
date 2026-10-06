@@ -1,4 +1,4 @@
-"""Idea 3 (Piyush, Discord l.504): does the W2 NETWORK gain from predicting the target anchored on
+"""Idea 3 (a participant's suggestion on the challenge Discord): does the W2 NETWORK gain from predicting the target anchored on
 the NM off-block time, r = y - off_aobt3, instead of y?
 
 The trees already failed this (IDEAS 'Rejected on evidence': prc/models/anchored.py, anchored on

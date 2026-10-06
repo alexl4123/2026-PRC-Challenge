@@ -16,7 +16,7 @@
 # cluster (already there from earlier data syncs; `bash cluster/sync.sh` re-sends
 # them if not). The code itself arrives by `git pull`. Writes
 # cache/nn_final/nn_final_seedNN.npy + ranking_ids.npy. Pull them back with
-#   rsync -az vivaldi:03_2026_PRC_Challenge/2026-PRC-Challenge/cache/nn_final/ \
+#   rsync -az cluster:<repo>/cache/nn_final/ \
 #         <laptop repo>/cache/nn_final/
 #
 # --gres=gpu:1 is MANDATORY on -p gpu (devices are confined per cgroup; see

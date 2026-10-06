@@ -27,7 +27,7 @@ if torch.cuda.is_available():
           '| capability', torch.cuda.get_device_capability(0))
 else:
     print('NOTE: on the login node this is expected -- devices are confined per')
-    print('      cgroup, so copperhead itself sees none. Verify on a GPU node.')
+    print('      cgroup, so the login node itself sees none. Verify on a GPU node.')
     print('      Use the ABSOLUTE interpreter path: this script activated the')
     print('      env in its own subshell, so your shell is still on base and a')
     print('      bare `python` under srun would be the wrong one.')

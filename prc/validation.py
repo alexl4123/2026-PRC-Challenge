@@ -1,10 +1,12 @@
 """Metrics and the validation protocol.
 
-THE ONE RULE: evaluate on a target capped at TAIL_CAP. The uncapped metric on
-2025 data is ~95% noise from ~150 rows, and the 2026 scored labels demonstrably
-do not contain that tail (the leaderboard leader scores 239.13 while Jan+Jul 2025
-has an oracle floor of 391.0). Validating uncapped makes you reject good changes.
-See claude_log EXP01.
+History, kept for honesty: the first session (2026-09-21) evaluated on a target capped at
+TAIL_CAP, on the hypothesis that the uncapped 2025 metric was dominated by a few hundred
+tail rows that the scored months might not contain. That hypothesis was wrong and was
+dropped: every shipped decision from 2026-09-24 on was judged on ALL flights, uncapped, with
+paired and airport x local-day block bootstraps (`paired_bootstrap`, `block_bootstrap`) and
+a rule written before the run -- see docs/VALIDATION.md. The capped helpers below remain
+for the early experiments that used them.
 """
 import numpy as np
 import pandas as pd

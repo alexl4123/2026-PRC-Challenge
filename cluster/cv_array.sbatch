@@ -17,8 +17,8 @@ set -euo pipefail
 CAMPAIGN="${1:-seeds}"
 
 # Work from wherever sbatch was invoked rather than a hardcoded path, so the
-# clone can live anywhere (it is under ~/03_2026_PRC_Challenge/2026-PRC-Challenge
-# on copperhead, not ~/prc2026).
+# clone can live anywhere (it is under ~/<repo>
+# on the cluster login node, not ~/prc2026).
 REPO="${SLURM_SUBMIT_DIR:-$PWD}"
 cd "$REPO"
 mkdir -p logs

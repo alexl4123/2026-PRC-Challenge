@@ -1,4 +1,4 @@
-"""Idea 7 (Piyush, Discord l.504): apply the validation discipline to today's shipped decisions.
+"""Idea 7 (a participant's suggestion on the challenge Discord): apply the validation discipline to today's shipped decisions.
 
   require January AND July to improve separately; reject gains carried by < 100 rows;
   permutation control for classifier-based changes.

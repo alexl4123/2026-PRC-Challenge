@@ -2,8 +2,8 @@
 # Push the cached parquet and external data to the cluster. Read-only on the remote side
 # apart from the remote repo path. Never syncs outputs/ or any credential.
 set -euo pipefail
-REMOTE="${1:-vivaldi}"        # see cluster/README.md for the ~/.ssh/config stanza
-RPATH="${2:-03_2026_PRC_Challenge/2026-PRC-Challenge}"   # path on the remote, relative to $HOME
+REMOTE="${1:?pass the ssh host of the cluster}"        # see cluster/README.md for the ~/.ssh/config stanza
+RPATH="${2:?pass the repo path on the cluster, relative to \$HOME}"   # path on the remote, relative to $HOME
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 
 # CODE IS NOT SYNCED HERE. It reaches the cluster through git (commit locally,

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run ON copperhead. Creates a conda env with the stack the experiments need.
+# Run ON the cluster login node. Creates a conda env with the stack the experiments need.
 set -euo pipefail
 source "$HOME/miniconda3/etc/profile.d/conda.sh" 2>/dev/null \
     || source "$HOME/anaconda3/etc/profile.d/conda.sh"

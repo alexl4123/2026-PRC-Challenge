@@ -18,7 +18,7 @@
 #   cache/altfam_X.parquet, cache/altfam_y.npy, cache/altfam_month.npy, cache/strategy/v11s_oof.npy
 # and the TabICL regressor checkpoint in ~/.cache/huggingface/hub/models--jingang--TabICL.
 # Idempotent: a finished cell's npz in cache/tfm_r1/ is skipped. Pull back and report on the laptop:
-#   rsync -az vivaldi:03_2026_PRC_Challenge/2026-PRC-Challenge/cache/tfm_r1/ <laptop repo>/cache/tfm_r1/
+#   rsync -az cluster:<repo>/cache/tfm_r1/ <laptop repo>/cache/tfm_r1/
 #   python experiments/tfm/r1_bulk_retrieval.py --report
 set -euo pipefail
 REPO="${SLURM_SUBMIT_DIR:-$PWD}"

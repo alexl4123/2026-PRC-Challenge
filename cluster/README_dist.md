@@ -30,17 +30,17 @@ campaign definitions live in Python and the `--array` line has to match them:
 
 ## Exact commands
 
-    ssh copperhead 'cd ~/prc2026 && git pull'
-    ssh copperhead 'cd ~/prc2026 && python cluster/dist_task.py --campaign dist --size'
-    ssh copperhead 'cd ~/prc2026 && sbatch --array=0-71%30 cluster/dist_array.sbatch dist'
-    ssh copperhead 'cd ~/prc2026 && sbatch --array=0-35%30 cluster/dist_array.sbatch arch'
-    ssh copperhead 'squeue -u $USER'
-    ssh copperhead 'cd ~/prc2026 && conda activate prc2026 && python cluster/dist_collect.py dist'
+    ssh cluster 'cd ~/prc2026 && git pull'
+    ssh cluster 'cd ~/prc2026 && python cluster/dist_task.py --campaign dist --size'
+    ssh cluster 'cd ~/prc2026 && sbatch --array=0-71%30 cluster/dist_array.sbatch dist'
+    ssh cluster 'cd ~/prc2026 && sbatch --array=0-35%30 cluster/dist_array.sbatch arch'
+    ssh cluster 'squeue -u $USER'
+    ssh cluster 'cd ~/prc2026 && conda activate prc2026 && python cluster/dist_collect.py dist'
 
 Run `seeds` only after `dist` has produced a config worth ten seeds:
 
-    ssh copperhead 'cd ~/prc2026 && sbatch --array=0-119%30 cluster/dist_array.sbatch seeds'
-    ssh copperhead 'cd ~/prc2026 && conda activate prc2026 && \
+    ssh cluster 'cd ~/prc2026 && sbatch --array=0-119%30 cluster/dist_array.sbatch seeds'
+    ssh cluster 'cd ~/prc2026 && conda activate prc2026 && \
         python cluster/dist_collect.py seeds --seed-average'
 
 ## What healthy output looks like

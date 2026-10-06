@@ -1,5 +1,5 @@
-"""Label-free 2025 -> 2026 drift of the 35 adsb.lol columns (GREKI, Discord 2026-09-28: "features encoding where an
-aircraft was heard didn't transfer; features describing its movement did"). Jan+Jul 2025 vs Jan+Jul 2026, per airport:
+"""Label-free 2025 -> 2026 drift of the 35 adsb.lol columns (a participant's hint on the challenge Discord, 2026-09-28:
+features describing where an aircraft was heard may not transfer between years, features describing its movement may). Jan+Jul 2025 vs Jan+Jul 2026, per airport:
 coverage (non-null share) and, among non-null values, the two-sample KS distance. Output: cache/drift/d01_*.csv.
     python experiments/drift/d01_adsb_drift.py
 """

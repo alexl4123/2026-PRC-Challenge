@@ -22,7 +22,7 @@
 # and catboost showed how easily a 1 h limit wastes whole tasks. Writes
 # cache/family_final/<family>__seedNN.npy + ranking_ids.npy; existing files are
 # skipped. Pull them back with
-#   rsync -az vivaldi:03_2026_PRC_Challenge/2026-PRC-Challenge/cache/family_final/ \
+#   rsync -az cluster:<repo>/cache/family_final/ \
 #         <laptop repo>/cache/family_final/
 set -euo pipefail
 REPO="${SLURM_SUBMIT_DIR:-$PWD}"

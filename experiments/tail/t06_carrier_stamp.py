@@ -1,6 +1,5 @@
-"""Carrier stamping propensity on route D (no NM record), from a participant's hint (Discord 2026-09-28: "the echo of
-the planned time in the off-block is mostly a carrier thing when there's no NM match, and it's pretty stable month to
-month"). Two pre-registered tests in the v24 structure (experiments/tail/v24_oof.py), all flights, 2025.
+"""Carrier stamping propensity on route D (no NM record), from a participant's hint (challenge Discord, 2026-09-28: without an NM match, copying the
+planned time into the off-block is mostly a carrier habit and stable month to month). Two pre-registered tests in the v24 structure (experiments/tail/v24_oof.py), all flights, 2025.
 
 CARRIER = the 3-letter airline prefix of FLIGHT_mvt (the flight-plan operator field is empty on every route-D row).
 STAMP   = on route D with take-off > 30 min after schedule (off_sched > 1800 s), the block was written at the schedule:

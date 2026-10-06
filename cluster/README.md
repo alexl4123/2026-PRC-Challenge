@@ -1,4 +1,4 @@
-# Running on the TU Wien KR cluster
+# Running on a Slurm GPU cluster
 
 ## Why the cluster
 
@@ -17,18 +17,18 @@ Each individual fit is ~55 s and needs ~5 GB, so the natural unit of work is one
 
 ## Access
 
-The cluster is reached as `abeiser@vivaldi.kr.tuwien.ac.at` using a dedicated
-key at `~/.keyfiles/copperhead.key`. Adding this to `~/.ssh/config` means the
+The cluster is reached as `<user>@<cluster-host>` using a dedicated
+key at `~/.ssh/<cluster-key>`. Adding this to `~/.ssh/config` means the
 key never has to be passed explicitly, and rsync/scp pick it up too:
 
-    Host vivaldi
-        HostName vivaldi.kr.tuwien.ac.at
-        User abeiser
-        IdentityFile ~/.keyfiles/copperhead.key
+    Host cluster
+        HostName <cluster-host>
+        User <user>
+        IdentityFile ~/.ssh/<cluster-key>
         IdentitiesOnly yes
 
 The key must be mode 600 or ssh refuses to use it (`chmod 600
-~/.keyfiles/copperhead.key`).
+~/.ssh/<cluster-key>`).
 
 Environment, once, on the cluster: `bash cluster/setup_env.sh`.
 
@@ -36,16 +36,15 @@ Environment, once, on the cluster: `bash cluster/setup_env.sh`.
 
 Code travels by git; **data does not and must not**.
 
-    # once, on copperhead
+    # once, on the cluster login node
     git clone git@github.com:alexl4123/2026-PRC-Challenge.git \
-        ~/03_2026_PRC_Challenge/2026-PRC-Challenge
+        ~/<repo>
 
     # thereafter
-    ssh vivaldi 'cd ~/03_2026_PRC_Challenge/2026-PRC-Challenge && git pull'
+    ssh cluster 'cd ~/<repo> && git pull'
 
 `cluster/sync.sh` remains for the data only. It takes the remote host and
-remote path as arguments, defaulting to `vivaldi` and
-`03_2026_PRC_Challenge/2026-PRC-Challenge`.
+remote path as arguments (both required).
 
 ## Getting the DATA there
 
@@ -56,27 +55,27 @@ Two options:
 1. **Copy the local cache** (~264 MB, one off):
 
        rsync -az cache/training.parquet cache/ranking.parquet \
-             cache/external/ vivaldi:~/03_2026_PRC_Challenge/2026-PRC-Challenge/cache/
+             cache/external/ cluster:~/<repo>/cache/
 
    Without `~/.ssh/config`, pass the key explicitly:
 
-       rsync -az -e 'ssh -i ~/.keyfiles/copperhead.key' \
+       rsync -az -e 'ssh -i ~/.ssh/<cluster-key>' \
              cache/training.parquet cache/ranking.parquet cache/external/ \
-             abeiser@vivaldi.kr.tuwien.ac.at:~/03_2026_PRC_Challenge/2026-PRC-Challenge/cache/
+             <user>@<cluster-host>:~/<repo>/cache/
 
 2. **Fetch from the OSN bucket on the cluster**, using the team's own S3
-   credentials placed at `~/.config/prc2026/s3.env` on copperhead (mode 600).
+   credentials placed at `~/.config/prc2026/s3.env` on the cluster login node (mode 600).
    Cleaner, since nothing large crosses the laptop's uplink twice.
 
 Either way the data stays inside the user's own cluster home directory.
 
 ## Usage
 
-    ssh vivaldi 'cd ~/03_2026_PRC_Challenge/2026-PRC-Challenge && git pull'
-    ssh vivaldi 'cd ~/03_2026_PRC_Challenge/2026-PRC-Challenge && bash cluster/preflight.sh'
-    ssh vivaldi 'cd ~/03_2026_PRC_Challenge/2026-PRC-Challenge && sbatch --array=0-479%60 cluster/cv_array.sbatch grid'
-    ssh vivaldi 'squeue -u $USER'
-    ssh vivaldi 'cd ~/03_2026_PRC_Challenge/2026-PRC-Challenge && conda activate prc2026 && python cluster/collect.py grid'
+    ssh cluster 'cd ~/<repo> && git pull'
+    ssh cluster 'cd ~/<repo> && bash cluster/preflight.sh'
+    ssh cluster 'cd ~/<repo> && sbatch --array=0-479%60 cluster/cv_array.sbatch grid'
+    ssh cluster 'squeue -u $USER'
+    ssh cluster 'cd ~/<repo> && conda activate prc2026 && python cluster/collect.py grid'
 
 The user runs these; the output is pasted back for analysis.
 
