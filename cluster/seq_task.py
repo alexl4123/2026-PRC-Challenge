@@ -32,7 +32,8 @@ import numpy as np
 from prc.config import TAIL_CAP, CACHE
 from prc.io import peak_rss_gb
 
-REQUIRED = ['cache/v11/feat_training.parquet', 'cache/adsb_lol/features_training.parquet']
+_C = 'cache_final' if os.environ.get('PRC_RANKING') == 'final' else 'cache'   # final phase (2026-10-09)
+REQUIRED = [f'{_C}/v11/feat_training.parquet', f'{_C}/adsb_lol/features_training.parquet']
 
 
 def save(path, arr):
@@ -114,7 +115,7 @@ def main():
     a = ap.parse_args()
     fam = 'seqnc' if a.no_context else 'seq'
 
-    check_inputs(REQUIRED + (['cache/deice_0926/ind_training.parquet'] if a.deice else []))
+    check_inputs(REQUIRED + ([f'{_C}/deice_0926/ind_training.parquet'] if a.deice else []))
     if a.deice and a.campaign == 'seq':
         sys.exit('FATAL: --deice must not write into the seq campaign; pass --campaign seq_c1')
     campaign = 'seq_smoke' if a.smoke else a.campaign

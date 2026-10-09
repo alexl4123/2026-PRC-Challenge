@@ -8,8 +8,15 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]        # .../prc2026
 DATA = REPO.parent                                # .../00_src   <- parquets live here
-CACHE = REPO / 'cache'                            # gitignored, rebuildable
-OUTPUTS = REPO / 'outputs'                        # gitignored: models, submissions
+# FINAL PHASE (2026-10-09): PRC_RANKING=final points the whole pipeline at the organisers' final_ranking.parquet
+# (Jan, Feb, Jun, Jul 2026) with its own derived cache and outputs, so the initial-phase artefacts stay untouched.
+# Training-side inputs are mirrored into cache_final/ by tools/make_final_cache.py.
+FINAL = __import__('os').environ.get('PRC_RANKING', 'initial') == 'final'
+CACHE_BASE = REPO / 'cache'                       # the initial-phase cache (training-side inputs live here)
+CACHE = REPO / ('cache_final' if FINAL else 'cache')       # gitignored, rebuildable
+OUTPUTS = REPO / ('outputs_final' if FINAL else 'outputs')  # gitignored: models, submissions
+RANKING_FILE = 'final_ranking.parquet' if FINAL else 'ranking.parquet'
+SUBMIT_TEMPLATE = 'final_submitting.parquet' if FINAL else 'submitting.parquet'
 for _p in (CACHE, OUTPUTS):
     _p.mkdir(exist_ok=True)
 

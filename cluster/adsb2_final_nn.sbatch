@@ -16,8 +16,11 @@
 set -euo pipefail
 REPO="${SLURM_SUBMIT_DIR:-$PWD}"
 cd "$REPO"
+# final phase (2026-10-09): sbatch --export=ALL,PRC_RANKING=final ... reads/writes cache_final/
+C=cache
+if [ "${PRC_RANKING:-}" = final ]; then C=cache_final; fi
 mkdir -p logs
-for f in cache/v11/feat_training.parquet cache/v11/feat_ranking.parquet cache/adsb_lol/features_training.parquet cache/adsb_lol/features_ranking.parquet; do
+for f in $C/v11/feat_training.parquet $C/v11/feat_ranking.parquet $C/adsb_lol/features_training.parquet $C/adsb_lol/features_ranking.parquet; do
     [ -f "$f" ] || { echo "FATAL: $f missing"; exit 2; }
 done
 FAMS=(nn w3)

@@ -149,8 +149,9 @@ rk = build('ranking'); print(f'ranking features {rk.shape} {time.time()-t0:.0f}s
 for which, f in (('training', tr), ('ranking', rk)):
     ref = load(which, phase='DEP', columns=[ID])[ID].to_numpy()
     assert np.array_equal(ref, f[ID].to_numpy()), f'{which}: row order differs from load(phase=DEP)'
-comp = np.load(CACHE / 'final' / 'lgb_components.npz', allow_pickle=True)
-assert np.array_equal(comp['ids'], rk[ID].to_numpy()), 'ranking order differs from cache/final/lgb_components.npz ids'
+if (CACHE / 'final' / 'lgb_components.npz').exists():      # final phase: the components are built after this script
+    comp = np.load(CACHE / 'final' / 'lgb_components.npz', allow_pickle=True)
+    assert np.array_equal(comp['ids'], rk[ID].to_numpy()), 'ranking order differs from cache/final/lgb_components.npz ids'
 print('row order: training == load(DEP); ranking == load(DEP) == lgb_components ids')
 # shared categorical vocabularies (from TRAINING); unseen in ranking -> NaN
 for c in ['apt_s', 'ades_s']:

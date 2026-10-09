@@ -6,6 +6,8 @@
 # everything derived from them.
 cache/
 outputs/
+cache_final/
+outputs_final/
 *.parquet
 *.pkl
 *.npy

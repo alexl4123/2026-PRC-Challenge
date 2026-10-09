@@ -47,7 +47,10 @@ from adsb_days import days as all_days  # noqa: E402
 from adsb_match_measure import load_deps, match  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-BASE = REPO_ROOT / 'cache' / 'adsb_lol'
+BASE = REPO_ROOT / 'cache' / 'adsb_lol'          # points/ and events/ are shared by both phases
+sys.path.insert(0, str(REPO_ROOT))
+from prc.config import CACHE, FINAL  # noqa: E402
+OUT = CACHE / 'adsb_lol'                         # features_*.parquet: cache_final/adsb_lol in the final phase
 PY = sys.executable
 
 
@@ -131,7 +134,10 @@ def main():
     ok_days = set(have)
     results = {}
     for which in a.which:
-        months = ['2025-%02d' % k for k in range(1, 13)] if which == 'training' else ['2026-01', '2026-07']
+        if FINAL and which == 'training':
+            raise SystemExit('ERROR: the final phase only rebuilds the ranking-side features (use --which ranking)')
+        months = (['2025-%02d' % k for k in range(1, 13)] if which == 'training'
+                  else ['2026-01', '2026-02', '2026-06', '2026-07'] if FINAL else ['2026-01', '2026-07'])
         parts = []
         for mo in months:
             ds = [d for d in all_days() if d.startswith(mo)]
@@ -180,7 +186,8 @@ def main():
         out = add_stand_features(out, st)
         if not out.MVT_ID_mvt.is_unique:
             raise SystemExit(f'ERROR: duplicate MVT_ID_mvt in features_{which}')
-        dst = BASE / f'features_{which}.parquet'
+        OUT.mkdir(parents=True, exist_ok=True)
+        dst = OUT / f'features_{which}.parquet'
         out.to_parquet(dst.with_suffix('.tmp.parquet'), index=False)
         dst.with_suffix('.tmp.parquet').replace(dst)
         print(f'-> {dst} ({len(out):,} rows, {dst.stat().st_size / 1e6:.1f} MB)', flush=True)

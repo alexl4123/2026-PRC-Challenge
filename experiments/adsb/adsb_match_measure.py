@@ -28,6 +28,8 @@ import pyarrow.parquet as pq
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BASE = REPO_ROOT / 'cache' / 'adsb_lol'
+sys.path.insert(0, str(REPO_ROOT))
+from prc.config import CACHE as _CACHE      # cache_final/ when PRC_RANKING=final (its ranking.parquet is the final file)
 COLS = ['MVT_ID_mvt', 'APT', 'PHASE_mvt', 'CALLSIGN_flt', 'FLIGHT_mvt', 'AIRCRAFT_TYPE_mvt',
         'STAND_mvt', 'RUNWAY_mvt', 'MVT_TIME_UTC_mvt', 'BLOCK_TIME_UTC_mvt', 'SCHED_TIME_UTC_mvt',
         'AOBT_3_flt', 'TAXITIME_SEC_mvt']
@@ -44,7 +46,7 @@ def load_deps(days, which='training'):
             start = x
         prev = x
     runs.append((start, prev))
-    tabs = [pq.read_table(REPO_ROOT / 'cache' / f'{which}.parquet', columns=cols,
+    tabs = [pq.read_table(_CACHE / f'{which}.parquet', columns=cols,
                           filters=[('PHASE_mvt', '=', 'DEP'), ('MVT_TIME_UTC_mvt', '>=', a),
                                    ('MVT_TIME_UTC_mvt', '<', b + pd.Timedelta(days=1))]).to_pandas()
             for a, b in runs]

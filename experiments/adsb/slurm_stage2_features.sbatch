@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=prc-adsb2
-#SBATCH --partition=any
+#SBATCH --partition=gpu
+#SBATCH --gres=gpu:1   # the gpu partition rejects jobs without a GPU request; the "any" nodes are drained
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=16G
 #SBATCH --time=00:55:00
@@ -19,8 +20,11 @@
 set -euo pipefail
 REPO="${SLURM_SUBMIT_DIR:-$PWD}"
 cd "$REPO"
+# final phase (2026-10-09): sbatch --export=ALL,PRC_RANKING=final ... reads/writes cache_final/
+C=cache
+if [ "${PRC_RANKING:-}" = final ]; then C=cache_final; fi
 mkdir -p logs
-for f in cache/training.parquet cache/ranking.parquet; do
+for f in $C/training.parquet $C/ranking.parquet; do
   [ -f "$f" ] || { echo "FATAL: $f missing -- rsync it first (cluster/sync.sh)"; exit 2; }
 done
 source "$HOME/miniconda3/etc/profile.d/conda.sh" 2>/dev/null \

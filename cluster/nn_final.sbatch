@@ -25,6 +25,9 @@
 set -euo pipefail
 REPO="${SLURM_SUBMIT_DIR:-$PWD}"
 cd "$REPO"
+# final phase (2026-10-09): sbatch --export=ALL,PRC_RANKING=final ... reads/writes cache_final/
+C=cache
+if [ "${PRC_RANKING:-}" = final ]; then C=cache_final; fi
 mkdir -p logs
 
 source "$HOME/miniconda3/etc/profile.d/conda.sh" 2>/dev/null \

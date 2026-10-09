@@ -19,9 +19,9 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from .config import DATA, CACHE, CAT_COLS
+from .config import DATA, CACHE, CAT_COLS, FINAL, RANKING_FILE
 
-EXPECTED_ROWS = {'training': 4_167_797, 'ranking': 689_534}
+EXPECTED_ROWS = {'training': 4_167_797, 'ranking': 1_341_197 if FINAL else 689_534}
 
 
 def peak_rss_gb() -> float:
@@ -54,7 +54,9 @@ def _build_cache():
     TRUNCATED. The row-count assertion at the end is the backstop.
     """
     files = sorted(glob.glob(str(DATA / 'training_*.parquet')))
-    if not files:
+    if (CACHE / 'training.parquet').exists():
+        files = []                      # final phase: training.parquet is mirrored from the initial cache
+    elif not files:
         raise FileNotFoundError(f'no training_*.parquet under {DATA}')
 
     writer = schema = None
@@ -72,7 +74,7 @@ def _build_cache():
         if writer is not None:
             writer.close()
 
-    rk = pa.Table.from_pandas(_with_apt(pd.read_parquet(DATA / 'ranking.parquet')),
+    rk = pa.Table.from_pandas(_with_apt(pd.read_parquet(DATA / RANKING_FILE)),
                               preserve_index=False)
     pq.write_table(rk, CACHE / 'ranking.parquet', compression='zstd')
     del rk

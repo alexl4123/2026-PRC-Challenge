@@ -29,8 +29,9 @@ from prc.config import TARGET, TAIL_CAP, ID, CACHE
 from prc.io import peak_rss_gb
 from cluster.seq_task import check_inputs, check_alignment
 
-REQUIRED = ['cache/v11/feat_training.parquet', 'cache/v11/feat_ranking.parquet',
-            'cache/adsb_lol/features_training.parquet', 'cache/adsb_lol/features_ranking.parquet']
+_C = 'cache_final' if os.environ.get('PRC_RANKING') == 'final' else 'cache'   # final phase (2026-10-09)
+REQUIRED = [f'{_C}/v11/feat_training.parquet', f'{_C}/v11/feat_ranking.parquet',
+            f'{_C}/adsb_lol/features_training.parquet', f'{_C}/adsb_lol/features_ranking.parquet']
 
 
 
@@ -70,7 +71,7 @@ def main():
         sys.exit('FATAL: non-default settings need --tag (e.g. --epochs 15 --tag seq_ep15)')
     fam = 'seqnc' if a.no_context else 'seq'
 
-    check_inputs(REQUIRED + (['cache/deice_0926/ind_training.parquet', 'cache/deice_0926/ind_ranking.parquet']
+    check_inputs(REQUIRED + ([f'{_C}/deice_0926/ind_training.parquet', f'{_C}/deice_0926/ind_ranking.parquet']
                              if a.deice else []))
     base = a.tag or ('seq_c1' if a.deice else 'seq')
     outdir = CACHE / (base + ('_final_smoke' if a.smoke else '_final'))

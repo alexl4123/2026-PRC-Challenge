@@ -14,6 +14,9 @@
 set -euo pipefail
 REPO="${SLURM_SUBMIT_DIR:-$PWD}"
 cd "$REPO"
+# final phase (2026-10-09): sbatch --export=ALL,PRC_RANKING=final ... reads/writes cache_final/
+C=cache
+if [ "${PRC_RANKING:-}" = final ]; then C=cache_final; fi
 mkdir -p logs
 case "${VARIANT:-}" in
     ep60)      ARGS="--epochs 60" ;;
@@ -24,9 +27,9 @@ case "${VARIANT:-}" in
     ep40_lr3)  ARGS="--epochs 40 --lr 3e-3" ;;
     *) echo "FATAL: VARIANT must be one of ep60 ep80 ep40_d128 ep50_d128 ep40_l3 ep40_lr3 (got '${VARIANT:-}')"; exit 2 ;;
 esac
-for f in cache/training.parquet cache/ranking.parquet cache/v11/feat_training.parquet cache/v11/feat_ranking.parquet \
-         cache/adsb_lol/features_training.parquet cache/adsb_lol/features_ranking.parquet cache/external/metar \
-         cache/external/atfm_daily.csv prc/models/seq_net.py cluster/seq_final.py; do
+for f in $C/training.parquet $C/ranking.parquet $C/v11/feat_training.parquet $C/v11/feat_ranking.parquet \
+         $C/adsb_lol/features_training.parquet $C/adsb_lol/features_ranking.parquet $C/external/metar \
+         $C/external/atfm_daily.csv prc/models/seq_net.py cluster/seq_final.py; do
     [ -e "$f" ] || { echo "FATAL: $f missing -- git pull / rsync it first"; exit 2; }
 done
 SEED=$SLURM_ARRAY_TASK_ID
