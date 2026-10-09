@@ -21,13 +21,14 @@ LINK_DIRS = ['cv', 'external', 'adsb_lol/points', 'adsb_lol/raw', 'adsb_lol/even
 LINK_FILES = ['training.parquet']
 SKIP_TOP = {'final', 'strategy', 'tfm_w4', 'hunt', 'tail', 'plan_1001', 'plan_1006', 'routed_0926', 'exp63_smoke', 'exp63_screen',
             'deice_0926', 'drivers_0926', 'ground_sources', 'tfm_f1', 'tfm_f2', 'tfm_r1', 'drift', 'research_0925', 'altfam'}
-SKIP_FILES = {'major/m11d_pred_trailD.npy', 'major/m11f_candidates.npz'}
+SKIP_FILES = {'major/m11d_pred_trailD.npy', 'major/m11f_candidates.npz', 'exp64_p6_p7.npy', 'exp64_pred_v6recipe_v7.npy'}
+SKIP_PREFIX = ('exp64_seeds/', 'major/m11b_pred_')   # ranking-shaped arrays whose names lack 'ranking' (found by shape scan)
 
 
 def ranking_derived(rel: str) -> bool:
     top = rel.split('/')[0]
     return ('ranking' in rel or top.endswith('_final') or top.endswith('_final_smoke') or top in SKIP_TOP
-            or rel in SKIP_FILES or rel.startswith('adsb_lol/features_v2'))
+            or rel in SKIP_FILES or rel.startswith(SKIP_PREFIX) or rel.startswith('adsb_lol/features_v2'))
 
 
 def main():

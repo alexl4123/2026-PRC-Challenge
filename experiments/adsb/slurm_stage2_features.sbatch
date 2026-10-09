@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=prc-adsb2
-#SBATCH --partition=gpu
-#SBATCH --gres=gpu:1   # the gpu partition rejects jobs without a GPU request; the "any" nodes are drained
+#SBATCH --partition=gpu   # CPU-only on the gpu nodes (as adsb2_final.sbatch); the "any" nodes are drained (2026-10)
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=16G
 #SBATCH --time=00:55:00
