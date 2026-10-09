@@ -3,32 +3,34 @@
 Team **understanding-accordion**, PRC Data Challenge 2026 (taxi-out time at ten European airports).
 Author: Alexander Beiser (TU Wien), team understanding-accordion.
 
-This document explains how to rebuild our final submission at three depths. The final submission is v28: public-leaderboard
-RMSE 235.3996, uploaded 2026-10-06. Its predecessors are rebuilt the same way. The runbook [PIPELINE.md](PIPELINE.md)
+This document explains how to rebuild our submissions at three depths. Our best public-leaderboard file is v29: RMSE
+234.8988, uploaded 2026-10-06. Its predecessors are rebuilt the same way. The final-phase submission is the v29 design
+rebuilt on the organisers' final ranking file; §8 gives its commands and checks. The runbook [PIPELINE.md](PIPELINE.md)
 lists which script writes each intermediate file. The model is described in [MODEL.md](MODEL.md) and the validation
 protocol in [VALIDATION.md](VALIDATION.md).
 
 **Conventions.**
 - "2025" is the labelled training year: 12 monthly files, 2,085,047 departures.
 - "2026" is the ranking file: every departure of January and July 2026, 344,841 rows. We never had its per-flight
-  labels; on published monthly summaries of them, see §3.8.
+  labels; on published monthly summaries of them, see §3.8. The final ranking file of §8 adds February and June 2026.
 - Every 2026 number below is computed from our own predictions or from the unlabelled ranking file, and is marked
   *(label-free)*. The one exception is the public-leaderboard score of our own uploads, which is marked as such.
 - Measurements without a date come from our internal experiment log, which is not published. Measurements taken while
-  writing this document are dated 2026-10-06.
+  writing this document are dated 2026-10-06 or 2026-10-09.
 - Paths are relative to the repository root. `<cluster>` stands for the Slurm cluster we used.
 
 ## Summary
 
 | level | starts from | rebuilds | compute | what it demonstrates |
 |---|---|---|---|---|
-| **L0** | 75 stored model-output files (159 MB) and the challenge files | the shipped v24, v26, v27 and v28 | about 1 s and under 1 GB per build, on a laptop | each shipped file follows from one closed formula over the stored model outputs (v24 and v26 up to 2 s of rounding on 750 rows), with no hand edits and no earlier submission file read |
+| **L0** | 75 stored model-output files (159 MB) and the challenge files | the shipped v24 and v26-v29 | 1-8 s and under 2 GB per build, on a laptop | each shipped file follows from one closed formula over the stored model outputs (v24 and v26 up to 2 s of rounding on 750 rows), with no hand edits and no earlier submission file read |
 | **L1** | the cached feature tables | the 75 model outputs, then L0 | final fits only: about 7-8 GPU-hours on L40S, plus 18 CPU fits and three laptop CPU steps. With the fold campaigns that re-derive the blend weights: roughly 150 GPU-hours and 40 CPU-hours. All of these figures are estimates (§2.5). | the model outputs come from the code at the stated settings, up to run-to-run variation (not measured) |
 | **L2** | the raw challenge files and public data | the cached feature tables, then L1 | a 1.331 TB stream of adsb.lol archives (429 days), plus METAR and ATFM downloads | the features use only the challenge files and the open sources listed in §3 |
 
-L0 is checked: all four checks passed on 2026-10-06, and the v26 check also passed from a fresh clone on 2026-10-02.
-L1 and L2 are the procedures that produced the stored files, written down step by step. We have not re-run them end to
-end.
+L0 is checked: the v24-v28 checks passed on 2026-10-06 and the v29 check on 2026-10-09; the v26 check also passed from
+a fresh clone on 2026-10-02. L1 and L2 are the procedures that produced the stored files, written down step by step.
+We have not re-run them end to end for the initial ranking file; the final phase re-ran every ranking-side step on the
+final file (§8).
 
 ---
 
@@ -41,8 +43,8 @@ python3.12 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 
-- [`requirements.txt`](../requirements.txt) pins the versions of the laptop environment that built v24-v28: CPython 3.12.3
-  on Ubuntu 24.04.
+- [`requirements.txt`](../requirements.txt) pins the versions of the laptop environment that built v24-v29 and the
+  final file: CPython 3.12.3 on Ubuntu 24.04.
 - **pyarrow ≥ 20 is required.** Older versions fail on the challenge parquet files with
   `Repetition level histogram size mismatch`.
 - L0 imports only numpy, pandas and pyarrow.
@@ -99,7 +101,8 @@ derived from the challenge data. [PIPELINE.md §1](PIPELINE.md) gives the writer
 | `seq/swap_seqsw_ep30__…__seqsw_ep40_lr3.json`, `seq/arm_u.json` | 2 | the blend weights, the tercile cut points, the λ values of the U+T arm, and the gate verdicts |
 
 `assemble.py` also reads the ranking file's ids and five of its columns. With `--lobt-window` it also reads two columns of
-the 2025 training departures, for a self-test. `--check N` compares against `outputs/understanding-accordion_vN.parquet`,
+the 2025 training departures, for a self-test. With `--join-complement` it reads 12 movement columns (departures and
+arrivals) of the training and ranking files, plus the training `BLOCK_TIME`, for the clean links and their self-tests. `--check N` compares against `outputs/understanding-accordion_vN.parquet`,
 and `--out` uses `submitting.parquet` as the template.
 
 ### 1.2 Commands and expected output
@@ -109,21 +112,25 @@ python assemble.py --check 24
 python assemble.py --arm-u U --check 26
 python assemble.py --arm-u UT --check 27
 python assemble.py --arm-u UT --lobt-window --check 28
+python assemble.py --arm-u UT --lobt-window --join-complement --check 29
 ```
 
-Output of the last command, run on 2026-10-06 *(label-free: it compares our predictions with our predictions)*:
+Output of the last command, run on 2026-10-09 *(label-free: it compares our predictions with our predictions)*:
 
 ```
 LOBT self-test: 2,062,577 training departures, max |BLOCK - LOBT| = 3606 s, 0 outside -> OK
+join-complement self-test (2025): clean links 1,426, inside +-3606 0; one-sided 70, below hi 0; B' rows 1281, above lo 0; LEBL/LEMD above 3606: 0 -> OK
+join complement 2026: clean links 329 (6.8% of 4,844 IFR no-LOBT deps), arrival IFR NM coverage 99.40%; moved: A 9, B' 21, C 10; total 36; worst airport-day IFR no-LOBT share among moved rows 9.7%
 A/B/C outside P  339,551 rows: rows differing     0, max |diff|    0 s -> OK
 D outside P        3,570 rows: rows differing     0, max |diff|    0 s -> OK
 zone P             1,720 rows: rows differing     0, max |diff|    0 s -> OK
-v28: EQUIVALENT (P differs by old-chain rounding only)
+v29: EQUIVALENT (P differs by old-chain rounding only)
 ```
 
-The script prints the last line whenever the tolerances hold, even when nothing differs at all. All four checks report
-EQUIVALENT. Measured with the cache already built: 1.0-1.2 s wall time, peak memory 0.41 GB (`--check 24`) to 0.85 GB
-(`--check 28`).
+The script prints the last line whenever the tolerances hold, even when nothing differs at all. All five checks report
+EQUIVALENT. The per-rule counts in the third line count a row under every rule that touches it: C also applies to 4
+rows that A or B′ already moved, so 36 rows move in total (9 by A, 21 by B′, 6 by C alone). Measured with the cache already built:
+1.0-1.2 s wall time, peak memory 0.41 GB (`--check 24`) to 0.85 GB (`--check 28`); `--check 29` takes 7.5 s and 1.9 GB.
 
 | check | routes A/B/C (339,551 rows) | route D outside zone P (3,570) | zone P (1,720) |
 |---|---|---|---|
@@ -131,8 +138,9 @@ EQUIVALENT. Measured with the cache already built: 1.0-1.2 s wall time, peak mem
 | `--arm-u U --check 26` | 0 | 0 | 750, max 2 s |
 | `--arm-u UT --check 27` | 0 | 0 | 0 |
 | `--arm-u UT --lobt-window --check 28` | 0 | 0 | 0 |
+| `--arm-u UT --lobt-window --join-complement --check 29` | 0 | 0 | 0 |
 
-- **v27 and v28 match exactly.** `assemble.py` built them.
+- **v27, v28 and v29 match exactly.** `assemble.py` built them.
 - **v24 and v26 were built by the earlier delta chain** (builders `experiments/exp70`-`exp82`), in which every submission
   was an edit of the previous file. On 750 zone-P rows the chain accumulated rounding of at most 2 s. Every other row
   matches exactly.
@@ -142,11 +150,17 @@ EQUIVALENT. Measured with the cache already built: 1.0-1.2 s wall time, peak mem
   of the flight plan's LOBT, with the maximum exactly 3606 s. This guards against unit and time-zone bugs. It also asserts
   that no route-D or zone-P row carries an LOBT.
 - **v28 differs from v27 in 63 rows only** *(label-free)*. Each of them is moved exactly to the edge of its window.
+- **What `--join-complement` checks first.** On the 2025 files it re-measures each rule (clean links never inside
+  ±3606 s, one-sided rows never below the upper edge, B′ rows never above the lower edge, LEBL/LEMD never above 3606 s)
+  and refuses to build if one fails. On the ranking file it checks the clean-link share (5-10%), the arrival NM coverage
+  (≥ 99%) and the airport-day no-record share of every moved row (≤ the 2025 maximum), and asserts that no window row
+  moves.
+- **v29 differs from v28 in 36 rows only** *(label-free)*.
 
 **Writing a file.**
 
 ```bash
-python assemble.py --arm-u UT --lobt-window --out v128   # -> outputs/understanding-accordion_v128.parquet
+python assemble.py --arm-u UT --lobt-window --join-complement --out v129   # -> outputs/understanding-accordion_v129.parquet
 ```
 
 `--out` behaves as follows:
@@ -165,18 +179,19 @@ into it. `python assemble.py --arm-u U --check 26` reported EQUIVALENT, the same
 
 ### 1.3 Manifest of the shipped files
 
-These are the SHA-256 hashes of the files we uploaded for scoring, computed on 2026-10-06. The organisers hold the
-uploaded copies, so they can compare them.
+These are the SHA-256 hashes of the files we uploaded for scoring, computed on 2026-10-06 (v29 on 2026-10-09). The
+organisers hold the uploaded copies, so they can compare them. The final-phase file is listed in §8.
 
 | file | built by | L0 command | public leaderboard RMSE | SHA-256 |
 |---|---|---|---:|---|
 | `understanding-accordion_v24.parquet` | `experiments/exp81_submit_v21.py --pool <9 settings> --prev 23 --version 24` (2026-09-28) | `--check 24` | 244.2213 | `2cd656bc2fcba539a7d22038d3676cb9d68bd57be890ae6f20ae97f0cc409494` |
 | `understanding-accordion_v26.parquet` | `exp81 --pool <9> --arm-u U --prev 24 --version 26` (2026-10-02) | `--arm-u U --check 26` | 243.4219 | `888ab1d8ff168186debbb8991bfaebcb3ab338851154a8dee14362c019068111` |
 | `understanding-accordion_v27.parquet` | `assemble.py --arm-u UT --out v27` (2026-10-02) | `--arm-u UT --check 27` | 243.1478 | `8a5e97bdc3b9eaa602caec841e5a8fef36bb1963c9d9ff638b14465f20142d5e` |
-| `understanding-accordion_v28.parquet` | `assemble.py --arm-u UT --lobt-window --out v28` (2026-10-06) | `--arm-u UT --lobt-window --check 28` | **235.3996** | `0d1929c78ddc395187458f1824e3228e32922594e1033c4235e956b52c7cd4a2` |
+| `understanding-accordion_v28.parquet` | `assemble.py --arm-u UT --lobt-window --out v28` (2026-10-06) | `--arm-u UT --lobt-window --check 28` | 235.3996 | `0d1929c78ddc395187458f1824e3228e32922594e1033c4235e956b52c7cd4a2` |
+| `understanding-accordion_v29.parquet` | `assemble.py --arm-u UT --lobt-window --join-complement --out v29` (2026-10-06) | `--arm-u UT --lobt-window --join-complement --check 29` | **234.8988** | `34782eb3de5452f54eed86c6391f477fb25d13f17082b7d49795356080ccca6b` |
 
 - **Rows changed between consecutive files** *(label-free)*: v24 → v26, 319,221 rows; v26 → v27, 292,725 rows; v27 → v28,
-  63 rows.
+  63 rows; v28 → v29, 36 rows.
 - **v25 is not in this lineage.** It was a judgement call against our own validation rule and scored 1.07 s worse than v24
   on the public leaderboard. We dropped it, and `assemble.py` has no option that builds it. [VALIDATION.md](VALIDATION.md)
   gives the full record.
@@ -398,6 +413,9 @@ The order matters:
   - 2024-12-31 to 2025-12-31 (the eve of 1 January is needed for early-morning departures);
   - 2026-01-01 to 2026-01-31;
   - 2026-06-30 to 2026-07-31.
+
+  For the final phase it appends 58 days at the end (indices 429-486), so the indices above are unchanged:
+  2026-02-01 to 2026-02-28 and 2026-05-31 to 2026-06-29 (§8).
 - **Releases.** `adsb_download.py` picks the release that the archive's own `PREFERRED_RELEASES.txt` names for each day.
   The listed days add up to **1.331 TB**. That volume is streamed, never stored.
 
@@ -453,8 +471,11 @@ With the tables of §2.1 in place, run §2 and then §1.
 ### 3.8 Inputs that are deliberately not part of the pipeline
 
 - **EUROCONTROL's published monthly airport taxi-out figures for January and July 2026.** They summarise the evaluation
-  labels. We identified them and saw them during scouting on 2026-09-21 and 2026-09-23, and deliberately did not use
-  them. No code in this repository reads them.
+  labels. We identified them and saw them during scouting on 2026-09-21 and 2026-09-23, and excluded them by team rule.
+  On 2026-10-09, after the organisers had confirmed twice that they are allowed, the team decided they could be used if
+  measured and gated first. `experiments/eurocontrol/ec01_value.py` measures the 2025 file as an additive
+  per-airport-month shift of our 2025 out-of-fold predictions: every variant is worse on the held-out months (+0.87 to
+  +4.17 s). They are therefore not used in any submission, and no code in this repository reads the 2026 figures.
 - **OpenSky Trino and state vectors.** Not used.
 - **OPDI.** Evaluated with event counts only; not used in the model.
 - **Our own leaderboard client.** `tools/leaderboard.py` reads the public leaderboard API. Nothing in the pipeline uses it.
@@ -479,8 +500,9 @@ These are the places where the shipped model depends on something a clean L1/L2 
      had been calibrated against the live v9 → v10 score change.
    - Both choices are still in the shipped model: full strength in zone P, half strength on route D outside it.
      [VALIDATION.md](VALIDATION.md) has the full account.
-3. **The no-context twin finals of v27 and v28 were CPU runs, not the documented GPU job.** The cluster was unreachable,
-   so on 2026-10-02 we trained `cache/seq_final/seqnc__seed0{0,1,2}.npy` on the laptop.
+3. **The no-context twin finals of v27-v29 were CPU runs, not the documented GPU job.** The cluster was unreachable,
+   so on 2026-10-02 we trained `cache/seq_final/seqnc__seed0{0,1,2}.npy` on the laptop. For the final file they were
+   refitted by the documented GPU job (§8).
    - Command: `python cluster/seq_final.py --seed N --no-context --device cpu --threads 6`, in fp32.
    - The documented route is `sbatch --export=ALL,SEQ_FAMILY=seqnc cluster/seq_final.sbatch`, and the out-of-fold twin
      predictions from which the U+T weights were fitted came from GPU runs with bf16 autocast. It is the same code and
@@ -505,6 +527,9 @@ These are the places where the shipped model depends on something a clean L1/L2 
    - The decision to ship it rests on the 2025 data alone.
    - The rule and the code were committed (`618ba86`) before v28 was built, but after the rule's 2025 effect had been
      measured. The commit order is consistent with that account.
+7. **The join-complement rules and the LEBL/LEMD cap** (v29) were read off the 2025 files by our own post-hoc
+   structure search. `assemble.py --join-complement` re-measures them on every build. Header and code were committed
+   (`df0a5ff`) before v29 was built, after the rules' 2025 effect had been measured.
 
 ---
 
@@ -516,8 +541,9 @@ These are the places where the shipped model depends on something a clean L1/L2 
 - **`cache/external/atfm_daily.csv` has no writer in the repository.** §3.3 gives the source, the procedure and code that
   reproduces it byte for byte from the stored workbook.
 - **`cache/blend_oof_mix_nn3.npy` has no writer in the repository.** It was saved interactively. §3.6 says what it holds.
-- **`experiments/strategy/s21_tfm_P_final.py` imports TabPFN unconditionally**, although `assemble.py` uses only its TabICL
-  output. To run it as written, install `tabpfn==9.0.0` (commented out in `requirements.txt`).
+- **`experiments/strategy/s21_tfm_P_final.py` also computes a TabPFN probability**, which `assemble.py` does not use. Since
+  the final phase the TabPFN import is optional and the script skips that diagnostic if `tabpfn` is missing
+  (`tabpfn==9.0.0` is commented out in `requirements.txt`).
 - **The data location is fixed** to the parent directory of the clone (§0.2). There is no environment variable for it.
 - **The cluster environments were not pinned.** `cluster/setup_env*.sh` install without versions, and the resulting
   versions were not recorded. Only the laptop environment is pinned.
@@ -529,8 +555,11 @@ These are the places where the shipped model depends on something a clean L1/L2 
   code: in `ideas_outside2/`, `ideas_inside/`, `review_*/`, `deice_0926/`, `discord_eval/`, `ground_sources/` and
   `plan_1001/live_proj.py`. So does the interpreter path in the laptop driver `experiments/adsb/run_days_local.sh`.
   None of them is needed for L0-L2.
-- **L1 and L2 have not been re-run end to end.** The stored components were produced by the runs described here, over
-  2026-09-21 to 2026-10-02.
+- **L1 and L2 have not been re-run end to end for the initial ranking file.** The stored components were produced by the
+  runs described here, over 2026-09-21 to 2026-10-02. The final phase re-ran every ranking-side step on the final file
+  (§8); the training-side caches were reused.
+- **adsb.lol coverage on a few June 2026 days is low** (for example 26% of departures matched on 06-25). We believe this
+  is a gap in the adsb.lol archive; it is being verified (§8).
 
 ---
 
@@ -538,7 +567,7 @@ These are the places where the shipped model depends on something a clean L1/L2 
 
 | machine | specification | used for |
 |---|---|---|
-| laptop | AMD Ryzen 7 PRO 7840U (8 cores, 16 threads), 29 GiB RAM visible to the OS, no CUDA GPU; Ubuntu 24.04, CPython 3.12.3 | feature building (§3.4, §3.6), the production tail classifier, TabICL, the route-D corrector, every blend and gate evaluation, the no-context twin finals of v27/v28, all assembly; adsb.lol prototyping. Every run was memory-capped (`systemd-run`, 6-12 GB) |
+| laptop | AMD Ryzen 7 PRO 7840U (8 cores, 16 threads), 29 GiB RAM visible to the OS, no CUDA GPU; Ubuntu 24.04, CPython 3.12.3 | feature building (§3.4, §3.6), the production tail classifier, TabICL, the route-D corrector, every blend and gate evaluation, the no-context twin finals of v27-v29, all assembly; the laptop steps of the final phase (§8); adsb.lol prototyping. Every run was memory-capped (`systemd-run`, 6-12 GB) |
 | `<cluster>`, partition `gpu` | one node with 8 × NVIDIA L40S, 64 CPUs, 2 TB RAM | sequence-model and network folds and finals; the CPU members' folds and finals (8 CPUs per task) |
 | `<cluster>`, partition `any` | CPU nodes, 1 h job limit | adsb.lol stage 1 (4 CPUs, 6 GB per day) and stage 2 (8 CPUs, 16 GB) |
 
@@ -557,5 +586,94 @@ decision rule written down before the deciding run. Commit subjects mark these r
 - v18's corrector factor was settled with a live check (§4 item 2).
 - v25 overrode our own rule, scored 1.07 s worse, and was dropped.
 - The v28 window rule was written down after its 2025 effect had been measured.
+- The v29 rules were found post hoc by a structure search on 2025 and written down after their effect had been measured.
 
 [VALIDATION.md](VALIDATION.md) gives the full account, including how the public leaderboard was and was not used.
+
+---
+
+## 8. Final phase: rebuild on the final ranking file
+
+On 2026-10-09 the organisers announced one blind final submission, `understanding-accordion_final.parquet`, on
+`final_ranking.parquet`: January, February, June and July 2026, 670,790 departures (152,719 / 144,158 / 181,791 /
+192,122), with the January and July times re-dithered. The design must not change. Deadline for the file and for this
+repository (the last commit before it counts): **2026-10-14 10:00 UTC**.
+
+Our final file is the v29 design rebuilt end to end on that file. No code path, setting, seed, blend weight, cut
+point, λ or rule was changed; nothing was selected or tuned on the final file.
+
+### 8.1 The switch
+
+- **Data.** Put `final_ranking.parquet` and `final_submitting.parquet` next to the training files (§0.2).
+- **`PRC_RANKING=final`** (in `prc/config.py`) points the whole pipeline at them: derived files go to `cache_final/`,
+  submissions to `outputs_final/` (both gitignored), and the writer validates 670,790 rows. The initial-phase `cache/`
+  and `outputs/` are not touched.
+- **Training-side inputs** (2025 features, out-of-fold predictions, blend weights, the 2025 TabICL context, ...) are
+  mirrored from `cache/` by `python tools/make_final_cache.py`: large read-only folders are symlinked, other files
+  copied, ranking-derived files skipped. A scan by array shape found 9 initial-ranking arrays whose names lack
+  "ranking"; they are excluded explicitly.
+
+### 8.2 Commands
+
+Every command runs from the repository root with `PRC_RANKING=final` set (and, on the laptop, under the memory cap of
+§0.1).
+
+```bash
+export PRC_RANKING=final
+# laptop, before the cluster
+python tools/make_final_cache.py
+python -c "from prc.io import load; load('ranking', columns=['MVT_ID_mvt'])"   # cache_final/ranking.parquet
+python experiments/v11/v11_features.py                                         # cache_final/v11/feat_ranking.parquet
+# cluster (after copying those two files into cache_final/ there): every cluster fit, chained
+bash cluster/final_phase.sh
+# laptop, meanwhile
+python experiments/exp65_submit_v8.py --stage components   # cache_final/final/lgb_components.npz
+python experiments/final/f01_spec_x.py                     # zone-P specialist + cache_final/exp62_cand_ranking.parquet
+python experiments/major/m00_base.py
+python experiments/major/m11_state_features.py
+python experiments/strategy/s21_tfm_P_final.py             # Rome TabICL
+python experiments/tfm/w4b_final.py --threads 3            # other airports, pooled TabICL
+# laptop, after the cluster fits are copied back into cache_final/
+python experiments/exp65_submit_v8.py --stage assemble --specialist x --w 0.5 --w-abc 0.65 --w-d 0.5 --version 9
+python experiments/major/m11d_state_routeD.py
+python experiments/major/m11f_candidate_arrays.py
+python assemble.py --arm-u UT --lobt-window --join-complement --out final   # outputs_final/understanding-accordion_final.parquet
+python experiments/final/f02_check_final.py
+```
+
+- **`cluster/final_phase.sh`** submits, with Slurm dependencies: adsb.lol stage 1 for the 58 February/June days
+  (§3.5), stage 2 for the ranking side, the seven member finals, the W2 `mix` finals, the network finals that v9
+  needs, the 27-fit sequence pool, and the 10-epoch sequence model and its no-context twin (here by the documented GPU
+  job, unlike §4 item 3). All jobs completed on 2026-10-09.
+- **`f01_spec_x.py`** replaces the specialist part of `exp64_submit_v7.py` + `exp64_export_spec.py`, whose shipped
+  reference files do not exist for the final file; the code is exp64's.
+- **The v9 file** in `outputs_final/` is only the corrector's frozen input (§4 item 1), rebuilt by the same recipe on
+  the final file. It is not a submission.
+
+### 8.3 Checks
+
+*Label-free* throughout; measured on 2026-10-09.
+
+| check | result |
+|---|---|
+| regression, initial mode: training features of `v11_features.py` | byte-identical to `cache/v11` |
+| regression, initial mode: `f01_spec_x.py` against the shipped specialist | identical (max \|Δp\| 0) |
+| regression, initial mode: Rome TabICL against the shipped probabilities | identical (max 0.0) |
+| regression, initial mode: `m00_base.py` training frames | identical |
+| re-dither: Jan/Jul movement times (and arrival in-block times), final minus initial | triangular ±12 s, i.e. two independent ±6 s integer dithers |
+| re-dither: `SCHED`, `LOBT`, `IOBT`, `EOBT`, `AOBT` | unchanged, so the 3606 s window still holds |
+| `assemble.py` self-tests and the official checks | pass; VALID, 670,790 rows, predictions 0 / 941 / 111,523 s (min / median / max), 174 above 7,200 s |
+| join complement on the final file | 52 rows moved (rule counts A 14, B′ 31, C 11; a row can count under two rules) |
+| replay against v29 on the 344,841 shared Jan/Jul departures | RMS difference 15.95 s: routes A/B/C 9.99, route D outside zone P 42.1, zone P 166.4; 0.23% of rows differ by > 60 s |
+| where the zone-P difference sits | 82% at Rome, where the TabICL probabilities moved (median 0, 90th percentile 0.027) |
+| the 63 window rows and 36 join-complement rows of v28/v29 | rebuilt by the same rules on the re-dithered inputs; 57/63 and 26/36 differ from v29 by a median of 4-5 s (max 23 s), because each window edge moves with the take-off time. No hand edit |
+| new months: mean prediction 2026 vs mean 2025 label | February 988 vs 1,002 s; June 989 vs 973 s |
+
+**Known data-coverage note.** adsb.lol coverage is low on a few June 2026 days (for example 26% of departures matched
+on 06-25). We believe this is a gap in the adsb.lol archive itself; it is being verified.
+
+### 8.4 The file
+
+| file | built by | SHA-256 (as built 2026-10-09) | status |
+|---|---|---|---|
+| `understanding-accordion_final.parquet` | `PRC_RANKING=final python assemble.py --arm-u UT --lobt-window --join-complement --out final` | `35afc1c1351cf8756c884f1974b8e1b8f72a1d76329082bd40705efe277ca6d0` | built and checked 2026-10-09; to be uploaded before the deadline |

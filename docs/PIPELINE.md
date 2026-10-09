@@ -3,7 +3,8 @@
 How the final submission of team **understanding-accordion** is produced, which script writes which
 intermediate file, and in which order things must run. Written 2026-10-02 for the reproducibility
 requirement of the PRC Data Challenge 2026 (code and documentation sufficient to reproduce the results); updated
-2026-10-06 for v28 (the LOBT window). Step-by-step rebuild instructions and checks are in [REPRODUCE.md](REPRODUCE.md).
+2026-10-06 for v28 (the LOBT window) and v29 (the join complement), and 2026-10-09 for the final phase (§6).
+Step-by-step rebuild instructions and checks are in [REPRODUCE.md](REPRODUCE.md).
 
 The challenge data is not part of this repository (Terms & Conditions). `prc/config.py` expects the
 challenge parquet files in the parent directory of the repository (`DATA = REPO.parent`); every derived file
@@ -12,9 +13,9 @@ goes to `cache/` (gitignored, rebuildable) and every submission to `outputs/` (g
 ## 0. The final step: `assemble.py`
 
 ```
-python assemble.py --arm-u UT --lobt-window --out v28    # writes outputs/understanding-accordion_v28.parquet
-python assemble.py --arm-u UT --lobt-window --check 28   # checks equivalence with a shipped file
-python assemble.py --arm-u UT --check 27                 # likewise v27, --arm-u U --check 26, --check 24
+python assemble.py --arm-u UT --lobt-window --join-complement --out v29    # writes outputs/understanding-accordion_v29.parquet
+python assemble.py --arm-u UT --lobt-window --join-complement --check 29   # checks equivalence with a shipped file
+python assemble.py --arm-u UT --lobt-window --check 28   # likewise v28, --arm-u UT --check 27, --arm-u U --check 26, --check 24
 ```
 
 `assemble.py` reads only the model outputs listed in section 1 -- no earlier submission file -- and applies one
@@ -23,8 +24,8 @@ closed formula per row group:
 | row group | rule | rows in the 2026 ranking set |
 |---|---|---:|
 | routes A/B/C (NM off-block `AOBT_3_flt` present), outside zone P | `rint(clip(blend_A))`, then (with `--lobt-window`) projected into `[max(0, MVT − LOBT − 3606), MVT − LOBT + 3606]` | 339,551 |
-| route D (no `AOBT_3_flt`), outside zone P | `rint(clip(blend_D + 0.5 * corr))` | 3,570 |
-| zone P (route D and take-off > 2 h after schedule) | `rint(clip(p * off_sched + (1 - p) * pb + corr))` | 1,720 |
+| route D (no `AOBT_3_flt`), outside zone P | `rint(clip(blend_D + 0.5 * corr))`, then (with `--join-complement`) rules A, B′, C | 3,570 |
+| zone P (route D and take-off > 2 h after schedule) | `rint(clip(p * off_sched + (1 - p) * pb + corr))`, then rules A, B′, C | 1,720 |
 
 - `blend_X` = the 8-member blend under the production tail classifier: for each of its 5 seeds
   `clip(Wb * p_s * et + (1 - p_s) * sum_f w_f * bulk_f + w_routed * routed)`, then the mean over seeds.
@@ -35,10 +36,16 @@ closed formula per row group:
   with an LOBT has its off-block within ±3606 s of it, with zero exceptions); the idea was adopted from public
   competitor repositories, see the README credits. A self-test refuses to build unless the 2025 file still shows
   this exact bound. In 2026 the window moved 63 rows of v27 (label-free).
+- With `--join-complement` (v29), three rules for rows without an LOBT follow the window: A raises the prediction of a
+  route-D departure whose own NM record appears on its destination's arrival row (so its own join failed) to the upper
+  edge of that arrival's LOBT window, where the lower side is impossible; B′ lowers the two-sided cases to the lower edge (stamping and
+  local-midnight cases excluded); C caps LEBL and LEMD at 3,606 s. Each rule is re-measured on 2025 before every build,
+  and label-free 2026 checks must pass. In 2026 they moved 36 rows of v28 (label-free). Found post hoc by a structure
+  search on 2025; see [MODEL.md](MODEL.md) §10.1.
 - Equivalence: `--check 24` and `--arm-u U --check 26` reproduce the shipped v24/v26 exactly on routes A/B/C and
   route D; zone P differs by at most 2 s (rounding accumulated by the old build chain, in which every submission
   was an edit of the previous one). `--arm-u UT --check 27` and `--arm-u UT --lobt-window --check 28` reproduce v27
-  and v28 exactly.
+  and v28 exactly; `--arm-u UT --lobt-window --join-complement --check 29` reproduces v29 exactly.
 
 ## 1. Components read by `assemble.py`
 
@@ -95,7 +102,8 @@ about as long as a fold of the same setting. The whole set above is roughly 150 
 scored better, held-out airport x local-day block-bootstrap 95% interval below 0, January and July each better, every
 seed better, and the gain not carried by the 100 most-improved rows (R1-R5; from 10-02 also X1/X2); earlier versions
 were judged by simpler rules. Uploads not decided by such a rule (the leaderboard tests v1/v2, v7 and v10, the v18
-tie-break, the v25 override, and the v28 window, whose header was written after its 2025 effect was measured) are set
+tie-break, the v25 override, the v28 window, whose header was written after its 2025 effect was measured, and the v29
+rules, found post hoc) are set
 out in [VALIDATION.md](VALIDATION.md). The scripts are under `experiments/` (`seq/seq_swap_eval.py`, `seq/arm_u_eval.py`,
 `adsb/a3_eval.py`, ...); every result was recorded in an internal experiment log (not published), and
 [RESULTS.md](RESULTS.md) reports them upload by upload.
@@ -113,3 +121,24 @@ out in [VALIDATION.md](VALIDATION.md). The scripts are under `experiments/` (`se
 
 The full licence table, the ODbL attribution notice and the data deliberately not used are in the
 [README](../README.md#data-sources-and-licences).
+
+## 6. Final phase (`PRC_RANKING=final`)
+
+The organisers' final ranking file (January, February, June and July 2026; 670,790 departures) is served by the same
+pipeline, unchanged, with `PRC_RANKING=final`: `prc/config.py` then reads `final_ranking.parquet` and
+`final_submitting.parquet` and writes to `cache_final/` and `outputs_final/`. Deadline for the file and the
+repository: 2026-10-14 10:00 UTC. Commands and checks: [REPRODUCE.md](REPRODUCE.md) §8.
+
+| step | where | writes (under `cache_final/` unless stated) |
+|---|---|---|
+| `tools/make_final_cache.py` | laptop | training-side mirror of `cache/` (symlinks and copies; ranking-derived files skipped) |
+| `prc/io.py`, `experiments/v11/v11_features.py` | laptop | `ranking.parquet`, `v11/feat_ranking.parquet` |
+| `bash cluster/final_phase.sh` | cluster | adsb.lol stage 1 (58 Feb/Jun days) and stage 2, `adsb2_final/`, `w2_final/`, `nn_final/`, `seq_<V>_final/`, `seq_final/` (seq and seqnc), all chained |
+| `experiments/exp65_submit_v8.py --stage components` | laptop | `final/lgb_components.npz` |
+| `experiments/final/f01_spec_x.py` | laptop | `final/spec_x_ranking.npz`, `exp62_cand_ranking.parquet` |
+| `experiments/major/m00_base.py`, `m11_state_features.py` | laptop | `major/dep_ranking.parquet`, `major/m11_state_ranking.parquet` |
+| `experiments/strategy/s21_tfm_P_final.py`, `experiments/tfm/w4b_final.py` | laptop | `strategy/tfm_P_lirf_ranking.npz`, `tfm_w4/pool_nonrome_ranking.npz` |
+| `exp65_submit_v8.py --stage assemble ... --version 9` | laptop | `outputs_final/understanding-accordion_v9.parquet` (corrector input, not a submission) |
+| `experiments/major/m11d_state_routeD.py`, `m11f_candidate_arrays.py` | laptop | `major/m11f_candidates.npz` |
+| `python assemble.py --arm-u UT --lobt-window --join-complement --out final` | laptop | `outputs_final/understanding-accordion_final.parquet` |
+| `experiments/final/f02_check_final.py` | laptop | pre-upload checks: validation, replay against v29 on January/July, new months against 2025 |

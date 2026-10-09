@@ -6,15 +6,17 @@ Repository: <https://github.com/alexl4123/2026-PRC-Challenge> · Challenge: <htt
 
 The task is to predict the taxi-out time in seconds of every departure in January and July 2026 at ten European
 airports: EDDF, EDDM, EGLL, EHAM, LEBL, LEMD, LFPG, LIRF, LSZH and LTFM. That is 344,841 departures, scored by RMSE.
-The training data are the labelled 2025 movements, which include 2,085,047 departures.
+The training data are the labelled 2025 movements, which include 2,085,047 departures. In the final phase, announced
+on 2026-10-09, a second ranking file adds February and June 2026 (670,790 departures; see [Final phase](#final-phase)).
 
-**Result at the time of writing (2026-10-06).** Submission v28 scores **235.3996 s** on the public leaderboard, rank
-21 of 232 teams. `python assemble.py --arm-u UT --lobt-window --out v28` rebuilds it from the stored model outputs.
+**Result at the time of writing (2026-10-09).** Submission v29 scores **234.8988 s** on the public leaderboard, rank
+21 of 232 teams on 2026-10-06 (23 on 2026-10-09). `python assemble.py --arm-u UT --lobt-window --join-complement --out v29`
+rebuilds it from the stored model outputs. The final-phase file is the same design rebuilt on the final ranking file.
 
 | Document | Contents |
 |---|---|
 | [docs/MODEL.md](docs/MODEL.md) | model design and the domain reasoning behind each component |
-| [docs/RESULTS.md](docs/RESULTS.md) | every upload v1-v28: change, builder, rows changed, offline expectation, rule outcome, live score |
+| [docs/RESULTS.md](docs/RESULTS.md) | every upload v1-v29: change, builder, rows changed, offline expectation, rule outcome, live score |
 | [docs/VALIDATION.md](docs/VALIDATION.md) | protocol, noise analysis, offline-to-live transfer, full account of leaderboard use |
 | [docs/REPRODUCE.md](docs/REPRODUCE.md) | environment, data downloads, rebuild levels L0-L2 and their checks |
 | [docs/PIPELINE.md](docs/PIPELINE.md) | runbook: which script or cluster job writes each component |
@@ -59,9 +61,10 @@ The eighth member is a set model over the 64 neighbouring movements at the same 
 Inside zone P, TabICL gives the probability that the recorded off-block is the scheduled time, and the prediction
 mixes take-off minus schedule with a real-taxi estimate. Where the NM record is missing, a corrector adds the
 airport's current state. Finally, every prediction for a departure with a flight-plan LOBT (routes A/B/C) is clipped
-into the ±3606 s window around that LOBT; the window is a property of how the dataset was joined.
+into the ±3606 s window around that LOBT; the window is a property of how the dataset was joined. Three further
+label-free rules (v29) bound 36 route-D rows whose own flight-plan join evidently failed, and cap LEBL/LEMD at 3606 s.
 
-### Components of the shipped model (v28)
+### Components of the shipped model (v29)
 
 1. **Routes.** `MVT − AOBT_3` is Network Manager's view of the quantity we predict. Rows with it and rows without it
    get separate blend weights (`assemble.py`).
@@ -97,7 +100,7 @@ into the ±3606 s window around that LOBT; the window is a property of how the d
    - It was built for the early-January 2026 EHAM disruption, when 20-40% of departures lacked an NM record
      (label-free).
    - It runs at full strength in zone P and at half strength elsewhere on route D.
-8. **LOBT window**, below.
+8. **LOBT window** and **join complement**, below.
 
 ### The LOBT window (v28)
 
@@ -121,6 +124,27 @@ into the ±3606 s window around that LOBT; the window is a property of how the d
     (618ba86).
   - A self-test refuses to build unless 2025 shows the exact window.
   - The idea comes from public competitor repositories ([Credits](#credits)).
+
+### The join complement (v29)
+
+- **The rules** (`assemble.py --join-complement`, applied after the window). They extend the same join reading to
+  departures *without* an LOBT.
+  - **A, one-sided.** A route-D IFR departure whose own NM record appears on its destination's arrival row (a "clean
+    link") evidently failed the join, so `|BLOCK − LOBT_arr| > 3606 s`. Where the lower side is impossible, the
+    prediction is raised to the upper edge. 2025: 1,426 clean links, 0 inside ±3606 s; 70 one-sided rows, 0 below the
+    upper edge.
+  - **B′, two-sided, below side.** Where both sides are possible, the prediction is lowered to the lower edge;
+    stamped-at-schedule rows and take-offs crossing local midnight are excluded. 2025: 1,281 of 1,281 such rows lie
+    below the lower edge. This is empirical, not a forced identity.
+  - **C, source cap.** LEBL and LEMD record no departure taxi above 3,606 s (2025 maximum 3,604 / 3,598 s).
+- **What v29 does** *(label-free)*. 36 rows moved: 9 up (A), 21 down (B′), 6 down (C). None of them is among the 63
+  window rows. If the rules hold, the bound was ≤ 235.023 s.
+- **Live result.** 235.3996 → 234.8988, −0.50 s.
+- **2025 out-of-fold** (in-sample for the rules): 140 rows change, none for the worse; held-out −0.62 s, January +
+  July −0.43 s.
+- **Order of events.** The rules were found post hoc by a structure search on 2025, not pre-registered. Header,
+  self-tests and code were committed before the build (df0a5ff); the team decided to upload. The window's
+  pre-commitment extends to these 36 rows.
 
 ### Information the model uses
 
@@ -161,8 +185,8 @@ Details are in [docs/VALIDATION.md](docs/VALIDATION.md).
   Information placed inside the members over-delivered (v14 ×3, v17 ×1.4, v20 ×4); correction layers and model
   diversity delivered about half (v11, v16).
 - **2025 out-of-fold RMSE.** The v28 structure scores 234.37 s on the held-out months and 290.68 s on January + July.
-  The v24 structure scored 235.44 s and 292.21 s.
-  - The window part of the v28 figure is in-sample.
+  The v24 structure scored 235.44 s and 292.21 s. The v29 rules take another 0.62 s and 0.43 s off.
+  - The window and join-complement parts of these figures are in-sample.
   - These levels are not comparable with the live score, so decisions use paired differences.
 
 ## Results
@@ -186,7 +210,8 @@ uploads are listed in [docs/RESULTS.md](docs/RESULTS.md).
 | v21-v24 | 09-27/28 | longer seq training; a pool of 27 seq fits | 244.22 | −1.51 |
 | v25 | 09-28 | Rome zone-P rule override (lost; dropped) | 245.29 | +1.07 |
 | v26-v27 | 10-02/06 | disagreement-tercile weights (U), then the context term (U+T) | 243.15 | −1.07 |
-| **v28** | 10-06 | **LOBT window** | **235.40** | **−7.75** |
+| v28 | 10-06 | LOBT window | 235.40 | −7.75 |
+| **v29** | 10-06 | **join complement and LEBL/LEMD cap (36 rows)** | **234.90** | **−0.50** |
 
 ## Building the submission
 
@@ -196,36 +221,55 @@ repository. By default, `prc/config.py` looks for them in the repository's paren
 challenge files and from adsb.lol.
 
 The environment is Python 3.12 with `pip install -r requirements.txt`. These are the laptop versions that built
-v24-v28. `pyarrow >= 20` is required.
+v24-v29 and the final-phase file. `pyarrow >= 20` is required.
 
 Level L0 assembles the submission from the stored model outputs in a few seconds, without training:
 
 ```
-python assemble.py --arm-u UT --lobt-window --out v28    # writes outputs/understanding-accordion_v28.parquet
-python assemble.py --arm-u UT --lobt-window --check 28   # compares with a shipped file in outputs/
+python assemble.py --arm-u UT --lobt-window --join-complement --out v29    # writes outputs/understanding-accordion_v29.parquet
+python assemble.py --arm-u UT --lobt-window --join-complement --check 29   # compares with a shipped file in outputs/
+python assemble.py --arm-u UT --lobt-window --check 28
 python assemble.py --arm-u UT --check 27
 python assemble.py --arm-u U --check 26
 python assemble.py --check 24
 ```
 
 - **Checks.**
-  - On 2026-10-06, `--check 27` and `--check 28` found 0 differing rows.
+  - On 2026-10-06, `--check 27` and `--check 28` found 0 differing rows; on 2026-10-09, `--check 29` likewise.
   - `--check 24` and `--check 26` match exactly on routes A/B/C and route D. In zone P they differ by at most 2 s,
     the rounding accumulated by the old build chain, in which each file was an edit of the previous one.
-- **Inputs.** `assemble.py` never reads an earlier submission. Its header gives the formula for each row group and
-  the LOBT rule.
-- **Output.** `--out` refuses to overwrite an existing file; if `outputs/` already holds the shipped v28, write the
-  rebuild under another name (e.g. `--out v128`) or use `--check 28`.
+- **Inputs.** `assemble.py` never reads an earlier submission. Its header gives the formula for each row group, the
+  LOBT rule and the join-complement rules.
+- **Output.** `--out` refuses to overwrite an existing file; if `outputs/` already holds the shipped v29, write the
+  rebuild under another name (e.g. `--out v129`) or use `--check 29`.
 - **L1 and L2.** [docs/REPRODUCE.md](docs/REPRODUCE.md) describes the deeper rebuilds: L1 from the features and L2
   from the raw data.
   - L2 streams 1.331 TB of adsb.lol archives (429 days).
   - With their fold campaigns, the model fits take an estimated 150 GPU-hours on a Slurm node with 8 NVIDIA L40S
     GPUs, plus about 40 CPU-hours.
 
+## Final phase
+
+On 2026-10-09 the organisers announced one blind final submission, `understanding-accordion_final.parquet`, on
+`final_ranking.parquet`: January, February, June and July 2026, 670,790 departures, with the January and July times
+re-dithered. The design must not change. The deadline for the file and for this repository is 2026-10-14 10:00 UTC.
+
+- **What we submit.** The v29 design, unchanged, rebuilt end to end on the final file. No model, weight or rule was
+  changed. `PRC_RANKING=final` switches the whole pipeline to the final file, with its own `cache_final/` and
+  `outputs_final/`; [docs/REPRODUCE.md](docs/REPRODUCE.md) §8 has the commands and checks.
+- **New inputs.** adsb.lol days for February and June 2026 (58 days). Every component that depends on the ranking file
+  was refitted on 2025 and re-predicted.
+- **Checks** *(label-free)*. In initial mode the rebuilt steps reproduce the shipped components exactly. On the
+  344,841 January/July departures the final file shares with v29, the predictions differ by 15.95 s RMS (against
+  v29's live RMSE of 234.90 s), about half of it in zone P. The re-dither moves movement times by up to ±12 s and
+  leaves the flight-plan clocks unchanged, so the 3606 s window still holds; the 99 rows moved by v28/v29 are rebuilt
+  by the same rules, not copied.
+- **Status.** Built and checked on 2026-10-09; to be uploaded before the deadline.
+
 ## Repository layout
 
 ```
-assemble.py          canonical builder: stored model outputs -> submission (built v27 and v28)
+assemble.py          canonical builder: stored model outputs -> submission (built v27-v29 and the final file)
 requirements.txt     pinned laptop environment
 docs/                MODEL, RESULTS, VALIDATION, REPRODUCE, PIPELINE
 prc/                 package: config, io (memory-aware loading), features, congestion (queue state),
@@ -233,8 +277,9 @@ prc/                 package: config, io (memory-aware loading), features, conge
                      block bootstrap), submit (file checks), s3 (upload), models/ (tail specialist, routed,
                      embedding network, w3, seq set model, ...)
 cluster/             Slurm jobs (*.sbatch) and their Python tasks: fold fits and final fits of every member
-experiments/         exp01-exp82 and 20 topic folders; see experiments/README.md
+experiments/         exp01-exp82 and 22 topic folders; see experiments/README.md
 tools/leaderboard.py read-only client of the public leaderboard API
+tools/make_final_cache.py  mirrors the training-side cache for the final phase (PRC_RANKING=final)
 LICENSE              GNU GPL v3
 ```
 
@@ -252,7 +297,7 @@ LICENSE              GNU GPL v3
 | TabPFN v2; CatBoost | evaluated | Prior Labs License 1.1; Apache-2.0 | **not** in any shipped file |
 | OpenSky state vectors / Trino | none | excluded by the organisers | **not used**; one public sample day was read on 2026-09-22 to measure ground coverage |
 | OPDI flight events | coverage check (surface-event counts) | | **not used** in the model |
-| Published monthly airport taxi-out figures for Jan/Jul 2026 | none | | **deliberately not used**; see below |
+| EUROCONTROL monthly airport taxi-out figures (2025; January-July 2026) | 2025 file: measured as a calibration on 2025 (2026-10-09) | | **not used** in any submission; see below |
 
 **adsb.lol notice (ODbL §4.3):**
 
@@ -269,9 +314,15 @@ July 2026, and those indicators summarise the evaluation labels.
   which already covered January-July 2026, and noted each airport's change in monthly mean as a possible
   calibration; this was never implemented. On 2026-09-23 a scouting report for the team opened such a file again and
   quoted figures for Rome. That day the team decided not to use any summary of the scored months.
-- **Nothing depends on them.** No code here reads them, and no feature, weight or upload decision depends on them.
 - **What they could have been worth.** On our 2025 out-of-fold predictions, even a perfect per-airport-month level
   correction would have gained only 0.14 s on January + July.
+- **Policy changed on 2026-10-09, then measured.** After the organisers confirmed twice that the file is allowed, the
+  team decided it could be used if measured and gated first. `experiments/eurocontrol/ec01_value.py` applies the
+  2025 file to our 2025 out-of-fold predictions as an additive per-airport-month shift. Every variant was worse on the
+  held-out months: raw +4.17 s (1 of 12 months better), half-strength +1.18 s (4/12), corrected for each airport's
+  published-minus-recorded gap +2.94 s (0/12), gap-corrected at half strength +0.87 s (2/12).
+- **Nothing depends on them.** No submission uses the file, and no feature, weight or upload decision depends on it.
+  The measurement script reads only the 2025 file.
 
 ## Use of the public leaderboard
 
@@ -290,7 +341,7 @@ Every upload is scored on the full evaluation set, and the organisers monitor fo
     Its tie-break estimator favoured "drop".
   - That estimator failed a check against our own v9 → v10 live delta. The alternative estimator favoured "half",
     and the team chose "half" (`experiments/routed_0926/r03_calibrate.py`).
-  - The choice remains in v28 as the `0.5` in `assemble.py`.
+  - The choice remains in v29 and in the final file as the `0.5` in `assemble.py`.
 - **One rule override, which lost.** v25 (09-28) changed Rome's zone-P probabilities as a deliberate judgement call,
   after the change had failed its rule: January was worse and the gain was concentrated. It scored 1.07 s worse and
   was not carried forward.
@@ -300,6 +351,8 @@ Every upload is scored on the full evaluation set, and the organisers monitor fo
   - v13 and v25 each changed 180 of Rome's 181 zone-P rows (label-free counts), as one model component.
   - v28 changed 63 rows (label-free). We committed before v28 that no later upload will change a row the window
     moved, and that no implied label is derived from its score.
+  - v29 changed 36 other rows (label-free), under the same pre-commitment. Both apply to the initial ranking file;
+    in the final file these rows are rebuilt by the same rules ([Final phase](#final-phase)).
 - **Diagnostics on our own scores.** Some scripts do algebra on the squared-error difference between two of our
   uploads, to study offline-to-live transfer: `major/m04_live_decomp.py`, `major/m08_P_submission_deltas.py`,
   `strategy/s18_nn_weight_live.py`, `plan_1001/live_proj.py` and `routed_0926/r03_calibrate.py`.
@@ -315,8 +368,8 @@ Every upload is scored on the full evaluation set, and the organisers monitor fo
 - **Code and analysis.** These were written with AI assistance (Claude, Anthropic). The commits carry
   `Co-Authored-By` trailers.
 - **Rules.** From v6 on, most changes were gated by a rule written before their run. The exceptions are listed in the
-  previous section. In addition, v1-v5 predate written rules, and the v28 header was written after its 2025 numbers
-  were measured.
+  previous section. In addition, v1-v5 predate written rules, the v28 header was written after its 2025 numbers
+  were measured, and the v29 rules were found post hoc by a structure search on 2025.
 - **Record keeping.** Every result was recorded in an internal, date-stamped experiment log, which is not published.
   The documents in `docs/` are written from it.
 

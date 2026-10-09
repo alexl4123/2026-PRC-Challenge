@@ -2,7 +2,7 @@
 
 This folder holds every experiment we ran, kept as it was run. There are two kinds:
 - **numbered scripts**, `exp01`-`exp82` (2026-09-21 to 2026-09-28);
-- **20 topic folders**, one per study.
+- **22 topic folders**, one per study.
 
 Each script's header states the question, the protocol and, where one applies, the decision rule written before the
 run. Many headers also record the result. The upload-by-upload outcomes are collected in
@@ -19,7 +19,7 @@ are needed; everything else is a screen, a diagnostic or a dead end.
   `plan_1001/live_proj.py`). The scripts on the production path resolve their paths portably; a few still show the
   development machine's interpreter path in a usage comment.
 
-## Production path: what built v28
+## Production path: what built v29
 
 The order runs from the challenge files to `assemble.py`. All outputs go to the git-ignored `cache/`.
 [../docs/PIPELINE.md](../docs/PIPELINE.md) lists every file and job, and [../docs/REPRODUCE.md](../docs/REPRODUCE.md)
@@ -46,9 +46,12 @@ gives the commands.
 | 17 | `experiments/tail/v24_oof.py` | the v24-structure out-of-fold predictions that the U/U+T evaluation starts from |
 | 18 | `experiments/seq/seq_swap_eval.py` (arm M) | per-route NNLS weights of the eight members (`cache/seq/swap_*.json`) |
 | 19 | `experiments/seq/arm_u_eval.py` | tercile cut points, per-tercile weights, λ, and the gate verdicts for U and U+T (`cache/seq/arm_u.json`) |
-| 20 | `python assemble.py --arm-u UT --lobt-window --out v28` (run from the repository root) | the submission |
+| 20 | `python assemble.py --arm-u UT --lobt-window --join-complement --out v29` (run from the repository root) | the submission |
 
-- **How the seqnc finals were run.** For v27 and v28, the three `seqnc` finals were run with
+- **Final phase.** The final file runs the same path with `PRC_RANKING=final`: `tools/make_final_cache.py` first,
+  `cluster/final_phase.sh` for every cluster fit, `final/f01_spec_x.py` for the zone-P specialist and candidate
+  features, and `final/f02_check_final.py` for the pre-upload checks ([../docs/REPRODUCE.md](../docs/REPRODUCE.md) §8).
+- **How the seqnc finals were run.** For v27-v29, the three `seqnc` finals were run with
   `cluster/seq_final.py --no-context --device cpu` on a laptop CPU in fp32. The fold fits used by the evaluation ran on
   GPU with bf16 autocast. It is the same model on a slightly different numeric path.
 - **Frozen inputs of the evaluation scripts.** Steps 18 and 19 also read older out-of-fold caches for the parts of
@@ -63,7 +66,7 @@ gives the commands.
 ## Which builder made which upload
 
 From v11 to v26, each submission was built as an edit of an earlier file (builders `exp70`-`exp82`). From v27 on,
-`assemble.py` computes the whole file from the components. `assemble.py --check 24/26/27/28` reproduces the earlier files from components alone; see the
+`assemble.py` computes the whole file from the components. `assemble.py --check 24/26/27/28/29` reproduces the earlier files from components alone; see the
 [README](../README.md#building-the-submission).
 
 | Version | Builder | Version | Builder |
@@ -77,7 +80,7 @@ From v11 to v26, each submission was built as an edit of an earlier file (builde
 | v8, v9 | `exp65_submit_v8.py` | v20 | `exp80_submit_v20.py` |
 | v10 | `exp69_submit_routeD.py` (leaderboard test) | v21-v24, v26 | `exp81_submit_v21.py` (`--epochs`, `--pool`, `--arm-u U`) |
 | v11 | `exp70_submit_v11.py` | v25 | `exp82_submit_v25.py` (rule override; lost, dropped) |
-| v12 | `exp71_submit_v12.py` | v27, v28 | `assemble.py` (repository root) |
+| v12 | `exp71_submit_v12.py` | v27-v29, final | `assemble.py` (repository root) |
 | v13 | `exp72_submit_v13.py` | | |
 
 `exp67_submit_v10.py` was written for a family blend under the name "v10". It was renumbered, superseded by
@@ -92,6 +95,8 @@ From v11 to v26, each submission was built as an edit of an earlier file (builde
 | `discord_eval/` | 09-25 | residual-harness measurements of ideas raised by participants on the challenge Discord. Wake sequence and schedule backlog were adopted (via `cluster/w2_extra.py`); the validation discipline became gates R3/R5; the anchored network target, stand × runway encoding, dew-point spread and outlier matching were not adopted | screen |
 | `drift/` | 09-28 | label-free 2025 → 2026 drift of the adsb.lol columns and the members' reliance on coverage columns; closed, no action | diagnostic |
 | `drivers_0926/` | 09-26 | decomposition of the v17-structure out-of-fold error (cells, day-scale label artefacts, label-free 2026 mix); `d01_rows.py` is reused by the block bootstrap; `lb_snapshot.py` is read-only public API | diagnostic, one production helper |
+| `eurocontrol/` | 10-09 | `ec01_value.py`: value of EUROCONTROL's monthly taxi-out file as a per-airport-month calibration, measured on the 2025 analogue (2025 file against our 2025 out-of-fold predictions); every variant worse on the held-out months; not used | screen |
+| `final/` | 10-09 | final phase: `f01_spec_x.py` (zone-P specialist and candidate features on the final file, with an initial-mode regression check) and `f02_check_final.py` (pre-upload checks of the final file) | production |
 | `ground_sources/` | 09-27 | search for open ground surveillance at the ten airports (readsb snapshots and traces, OPDI surface-event counts); nothing usable at LTFM or LFPG | screen |
 | `ideas_inside/` | 09-23 | diagnostics `diag_a`-`diag_s` on ideas from inside the data (which clock BLOCK matches, stamping propensity, flight identity, target forms, a P2 specialist); the stack precursor of v11 | screen; needs scratch caches |
 | `ideas_outside2/` | 09-23 | screens of outside ideas on the v6 residual: stand turnover (later in v11), runway configuration, flight-level queue position, OSM stands, revision of off-block estimates, per-airport stacking | screen; absolute paths |
