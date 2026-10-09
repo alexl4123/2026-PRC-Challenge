@@ -335,7 +335,7 @@ def main():
         out = OUTPUTS / f'{TEAM}_{a.out}.parquet'
         if out.exists():
             fail(f'{out.name} exists; choose another name')
-        path = build(C.ids, new, version=int(a.out.lstrip('v')), clip=(0.0, HI))
+        path = build(C.ids, new, version='final' if a.out == 'final' else int(a.out.lstrip('v')), clip=(0.0, HI))
         got = pd.read_parquet(path).set_index(ID)['TAXITIME_SEC_mvt'].reindex(C.ids).to_numpy().astype(float)
         if not np.array_equal(got, new):
             fail('the written file differs from the in-memory build')

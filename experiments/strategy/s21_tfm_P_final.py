@@ -35,14 +35,17 @@ cov_tr = np.isfinite(Xtr).mean(0); cov_rk = np.isfinite(Xrk).mean(0)
 bad = [(c, round(a, 3), round(b, 3)) for c, a, b in zip(num, cov_tr, cov_rk) if abs(a - b) > 0.10]
 print('coverage gaps > 10 pp (train vs ranking):', bad if bad else 'none')
 out = dict(pos=rk_rows[lrk], apt=rk.apt.astype(str).to_numpy()[lrk], month=rk.month.to_numpy()[lrk])
-from tabpfn import TabPFNClassifier
-from tabpfn.constants import ModelVersion
-ps = []
-for rs in [0, 1, 2]:
-    clf = TabPFNClassifier.create_default_for_version(ModelVersion.V2, device='cpu', n_estimators=8, random_state=rs,
-                                                     ignore_pretraining_limits=True)
-    clf.fit(Xtr, ttr); ps.append(clf.predict_proba(Xrk)[:, 1])
-out['p_tabpfn'] = np.mean(ps, 0)
+try:                    # p_tabpfn is diagnostic only (the builders use p_tabicl); optional since the final phase
+    from tabpfn import TabPFNClassifier
+    from tabpfn.constants import ModelVersion
+    ps = []
+    for rs in [0, 1, 2]:
+        clf = TabPFNClassifier.create_default_for_version(ModelVersion.V2, device='cpu', n_estimators=8, random_state=rs,
+                                                         ignore_pretraining_limits=True)
+        clf.fit(Xtr, ttr); ps.append(clf.predict_proba(Xrk)[:, 1])
+    out['p_tabpfn'] = np.mean(ps, 0)
+except ImportError as e:
+    print('tabpfn skipped (diagnostic only):', e)
 try:
     from tabicl import TabICLClassifier
     ps = []
@@ -52,8 +55,9 @@ try:
 except Exception as e:
     print('tabicl skipped:', type(e).__name__, e)
 for k in [k for k in out if k.startswith('p_')]:
-    for m in [1, 7]:
+    for m in np.unique(out['month']):
         mm = out['month'] == m
         print(f'{k}: month {m}: n {mm.sum()}  mean p {out[k][mm].mean():.3f}  p>0.5 share {np.mean(out[k][mm] > 0.5):.3f}')
-np.savez(CACHE / 'strategy' / 'tfm_P_lirf_ranking.npz', **out)
-print('saved cache/strategy/tfm_P_lirf_ranking.npz')
+OUT = os.environ.get('S21_OUT') or CACHE / 'strategy' / 'tfm_P_lirf_ranking.npz'   # S21_OUT: regression-check target
+np.savez(OUT, **out)
+print('saved', OUT)
