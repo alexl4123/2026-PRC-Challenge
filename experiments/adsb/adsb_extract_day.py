@@ -84,6 +84,8 @@ class ConcatReader(io.RawIOBase):
         return True
 
     def readinto(self, b):
+        if self.i >= len(self.paths):                   # all parts consumed: stay at EOF on every further read
+            return 0
         retries = 0
         while True:
             try:
