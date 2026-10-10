@@ -205,7 +205,9 @@ def _members(tf):
 def stage1(date: str, parts, out_path: Path, workers: int):
     t0 = time.time()
     rd = io.BufferedReader(ConcatReader(parts), buffer_size=1 << 22)
-    tf = tarfile.open(fileobj=rd, mode='r|')
+    # ignore_zeros: a stream-mode TarFile ends SILENTLY at an invalid header after offset 0; on 2026-10-10 that cut
+    # three June 2026 staging archives after their first 2 GB part. Skip such blocks like GNU tar --ignore-zeros.
+    tf = tarfile.open(fileobj=rd, mode='r|', ignore_zeros=True)
     cols = {k: [] for k in ('icao', 'reg', 'typ', 'apt', 't', 'x', 'y', 'alt', 'ground', 'gs', 'trk',
                             'flags', 'vr', 'src', 'cs_ff', 'cs_bf', 'squawk')}
     n_files = n_hit = n_err = 0
@@ -231,6 +233,14 @@ def stage1(date: str, parts, out_path: Path, workers: int):
                 for c in ('src', 'cs_ff', 'cs_bf', 'squawk'):
                     cols[c].extend(list(p[c]))
     tf.close()
+    left = 0                                        # completeness guard: nothing of the parts may stay unread
+    while True:
+        chunk = rd.read(1 << 22)
+        if not chunk:
+            break
+        left += len(chunk.rstrip(b'\0'))
+    if left > (1 << 20):
+        raise SystemExit(f'ERROR: tar stream ended with {left:,} non-zero bytes of {parts} unread - truncated read')
     if n_files < 1000:
         raise SystemExit(f'ERROR: only {n_files} trace files read from {parts} - bad or truncated archive')
     if n_err > 0.01 * n_files:
