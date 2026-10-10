@@ -196,24 +196,79 @@ def _parse_safe(item):
         return name, None, repr(e)
 
 
-def _members(tf):
-    for m in tf:
-        if m.isfile() and '/traces/' in m.name and 'trace_full_' in m.name:
-            yield m.name, tf.extractfile(m).read()
+def _readn(raw, n):
+    out = bytearray()
+    while len(out) < n:
+        b = raw.read(n - len(out))
+        if not b:
+            break
+        out += b
+    return bytes(out)
+
+
+def iter_tar(raw, skips):
+    """(name, data) of every regular member of a tar STREAM, resynchronising after damage.
+
+    tarfile in stream mode ends silently at the first invalid header after offset 0 (on 2026-10-10 that dropped about
+    half of three June 2026 staging archives), and with ignore_zeros it can crash on the bytes that follow. Here an
+    invalid header starts a block-by-block scan for the next block that is a valid header (ustar magic + checksum);
+    every skipped region is appended to `skips` as (offset, bytes). Zero blocks (padding, end markers) are passed over,
+    so archives concatenated after an end marker are read as well. GNU long names ('L') are honoured.
+    """
+    off, long_name = 0, None
+    while True:
+        h = _readn(raw, 512)
+        if len(h) < 512:
+            return
+        start, off = off, off + 512
+        if h == bytes(512):
+            continue
+        ti = None
+        while True:
+            if h[257:262] == b'ustar':
+                try:
+                    ti = tarfile.TarInfo.frombuf(h, 'utf-8', 'surrogateescape')
+                except tarfile.HeaderError:
+                    ti = None
+            if ti is not None and 0 <= ti.size < (1 << 31):
+                break
+            ti = None
+            h = _readn(raw, 512)
+            if len(h) < 512:
+                skips.append((start, off - start))
+                return
+            off += 512
+        if off - 512 > start:
+            skips.append((start, off - 512 - start))
+            long_name = None
+        padded = (ti.size + 511) // 512 * 512
+        data = _readn(raw, padded)
+        off += len(data)
+        data = data[:ti.size]
+        if ti.type == tarfile.GNUTYPE_LONGNAME:
+            long_name = data.split(b'\0', 1)[0].decode('utf-8', 'surrogateescape')
+            continue
+        name, long_name = (long_name or ti.name), None
+        if ti.type in tarfile.REGULAR_TYPES:
+            yield name, data
+
+
+def _members(raw, skips):
+    for name, data in iter_tar(raw, skips):
+        if '/traces/' in name and 'trace_full_' in name:
+            yield name, data
 
 
 def stage1(date: str, parts, out_path: Path, workers: int):
     t0 = time.time()
     rd = io.BufferedReader(ConcatReader(parts), buffer_size=1 << 22)
-    # ignore_zeros: a stream-mode TarFile ends SILENTLY at an invalid header after offset 0; on 2026-10-10 that cut
-    # three June 2026 staging archives after their first 2 GB part. Skip such blocks like GNU tar --ignore-zeros.
-    tf = tarfile.open(fileobj=rd, mode='r|', ignore_zeros=True)
+    skips = []                                       # damaged regions skipped by iter_tar (offset, bytes)
     cols = {k: [] for k in ('icao', 'reg', 'typ', 'apt', 't', 'x', 'y', 'alt', 'ground', 'gs', 'trk',
                             'flags', 'vr', 'src', 'cs_ff', 'cs_bf', 'squawk')}
     n_files = n_hit = n_err = 0
     errs = []
     with Pool(workers) as pool:
-        for name, res, err in pool.imap_unordered(_parse_safe, _members(tf), chunksize=32):
+        for name, res, err in pool.imap_unordered(_parse_safe, _members(rd, skips), chunksize=32):
             n_files += 1
             if err:
                 n_err += 1
@@ -232,7 +287,6 @@ def stage1(date: str, parts, out_path: Path, workers: int):
                     cols[c].append(p[c])
                 for c in ('src', 'cs_ff', 'cs_bf', 'squawk'):
                     cols[c].extend(list(p[c]))
-    tf.close()
     left = 0                                        # completeness guard: nothing of the parts may stay unread
     while True:
         chunk = rd.read(1 << 22)
@@ -264,7 +318,8 @@ def stage1(date: str, parts, out_path: Path, workers: int):
     os.replace(tmp, out_path)
     stats = dict(date=date, n_trace_files=n_files, n_traces_near=n_hit, n_parse_errors=n_err,
                  n_points=len(df), n_icao=df.icao.nunique(), seconds=round(time.time() - t0, 1),
-                 bytes_read=rd.raw.nread, out_mb=round(out_path.stat().st_size / 1e6, 2))
+                 bytes_read=rd.raw.nread, n_skips=len(skips), bytes_skipped=sum(b for _, b in skips),
+                 first_skips=skips[:5], out_mb=round(out_path.stat().st_size / 1e6, 2))
     return df, stats
 
 
