@@ -314,13 +314,17 @@ def stage1(date: str, parts, out_path: Path, workers: int):
         'src': pd.Categorical(cols['src']), 'cs_ff': pd.Categorical(cols['cs_ff']),
         'cs_bf': pd.Categorical(cols['cs_bf']), 'squawk': pd.Categorical(cols['squawk']),
     })
+    # some staging archives hold the day's traces twice (2026-06-25: every row of the first 2 GB part again in the later
+    # parts); exact duplicate rows are dropped (complete prod days have 0-1 such rows in ~1.4 M)
+    n_dup = int(df.duplicated().sum())
+    df = df.drop_duplicates()
     df = df.sort_values(['apt', 'icao', 't'], kind='stable').reset_index(drop=True)
     tmp = out_path.with_suffix('.tmp.parquet')
     df.to_parquet(tmp, compression='zstd', index=False)
     os.replace(tmp, out_path)
     stats = dict(date=date, n_trace_files=n_files, n_traces_near=n_hit, n_parse_errors=n_err,
                  n_points=len(df), n_icao=df.icao.nunique(), seconds=round(time.time() - t0, 1),
-                 bytes_read=rd.raw.nread, n_skips=len(skips), bytes_skipped=sum(b for _, b in skips),
+                 bytes_read=rd.raw.nread, n_dup_dropped=n_dup, n_skips=len(skips), bytes_skipped=sum(b for _, b in skips),
                  first_skips=skips[:5], out_mb=round(out_path.stat().st_size / 1e6, 2))
     return df, stats
 
