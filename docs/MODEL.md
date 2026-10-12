@@ -796,10 +796,9 @@ component that predicts the ranking file was refitted and re-predicted, with ads
 - **Pre-committed rows.** The 63 window rows and 36 join-complement rows are rebuilt by the same rules on the
   re-dithered inputs; 57 of 63 and 26 of 36 differ from v29 by a median of 4–5 s (at most 23 s), because each window
   edge moves with its take-off time. Nothing was edited by hand. In the final file the join complement moves 52 rows.
-- **Agreement with v29 [label-free].** On the 344,841 shared January/July departures the predictions differ by 15.95 s
-  RMS (A/B/C 9.99 s, route D outside P 42.1 s, zone P 166.4 s); 82% of the zone-P difference is at Rome, where the
+- **Agreement with v29 [label-free].** On the 344,841 shared January/July departures the predictions differ by 16.11 s
+  RMS (A/B/C 10.24 s, route D outside P 42.2 s, zone P 166.4 s); 82% of the zone-P difference is at Rome, where the
   TabICL probabilities moved (median 0, 90th percentile 0.027).
 - **New months [label-free].** Mean prediction February 988 s and June 989 s, against 2025 mean labels of 1,002 s and
   973 s for the same months.
-- **Known data-coverage note.** adsb.lol coverage is low on a few June 2026 days (for example 26% of departures matched
-  on 06-25). We believe this is a gap in the adsb.lol archive; it is being verified.
+- **adsb.lol short reads, fixed before upload.** On 2026-10-10 we found that stage 1 had read only the first 2 GB part of five adsb.lol "staging" archives (2025-10-14, 2026-01-29, 06-07, 06-23, 06-25): Python's stream tar reader stops silently at a damaged header, and each of these archives has one (35-76 KB) just past the part boundary. Stage 1 now uses its own resynchronising reader (`iter_tar`), fails loudly on any unread remainder, and drops exact duplicate rows (these archives repeat their first part). The four final-file days were re-extracted and every ADS-B-dependent component refitted: 11,350 of 670,790 predictions changed, 11,328 of them on those days (6.6 s RMS over the file). The training day 2025-10-14 (0.3% of training departures) was left as the shipped model saw it. After the fix 06-25 is still thin in the source (31% of departures matched). Details: [VALIDATION.md](VALIDATION.md) §8.

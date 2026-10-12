@@ -558,8 +558,9 @@ These are the places where the shipped model depends on something a clean L1/L2 
 - **L1 and L2 have not been re-run end to end for the initial ranking file.** The stored components were produced by the
   runs described here, over 2026-09-21 to 2026-10-02. The final phase re-ran every ranking-side step on the final file
   (§8); the training-side caches were reused.
-- **adsb.lol coverage on a few June 2026 days is low** (for example 26% of departures matched on 06-25). We believe this
-  is a gap in the adsb.lol archive; it is being verified (§8).
+- **adsb.lol short reads (fixed 2026-10-10).** Five staging archives had been read only up to their first 2 GB part; the
+  four final-file days were re-extracted with the fixed stage 1 (`cluster/final_refix.sh`); the training day 2025-10-14 was
+  left as shipped (§8).
 
 ---
 
@@ -664,16 +665,16 @@ python experiments/final/f02_check_final.py
 | re-dither: `SCHED`, `LOBT`, `IOBT`, `EOBT`, `AOBT` | unchanged, so the 3606 s window still holds |
 | `assemble.py` self-tests and the official checks | pass; VALID, 670,790 rows, predictions 0 / 941 / 111,523 s (min / median / max), 174 above 7,200 s |
 | join complement on the final file | 52 rows moved (rule counts A 14, B′ 31, C 11; a row can count under two rules) |
-| replay against v29 on the 344,841 shared Jan/Jul departures | RMS difference 15.95 s: routes A/B/C 9.99, route D outside zone P 42.1, zone P 166.4; 0.23% of rows differ by > 60 s |
+| replay against v29 on the 344,841 shared Jan/Jul departures | RMS difference 16.11 s: routes A/B/C 10.24, route D outside zone P 42.2, zone P 166.4; 0.25% of rows differ by > 60 s |
 | where the zone-P difference sits | 82% at Rome, where the TabICL probabilities moved (median 0, 90th percentile 0.027) |
 | the 63 window rows and 36 join-complement rows of v28/v29 | rebuilt by the same rules on the re-dithered inputs; 57/63 and 26/36 differ from v29 by a median of 4-5 s (max 23 s), because each window edge moves with the take-off time. No hand edit |
 | new months: mean prediction 2026 vs mean 2025 label | February 988 vs 1,002 s; June 989 vs 973 s |
 
-**Known data-coverage note.** adsb.lol coverage is low on a few June 2026 days (for example 26% of departures matched
-on 06-25). We believe this is a gap in the adsb.lol archive itself; it is being verified.
+**adsb.lol short reads, fixed before upload.** On 2026-10-10 we found that stage 1 had read only the first 2 GB part of five adsb.lol "staging" archives (2025-10-14, 2026-01-29, 06-07, 06-23, 06-25): Python's stream tar reader stops silently at a damaged header, and each of these archives has one (35-76 KB) just past the part boundary. Stage 1 now uses its own resynchronising reader (`iter_tar`), fails loudly on any unread remainder, and drops exact duplicate rows (these archives repeat their first part). The four final-file days were re-extracted and every ADS-B-dependent component refitted: 11,350 of 670,790 predictions changed, 11,328 of them on those days (6.6 s RMS over the file). The training day 2025-10-14 (0.3% of training departures) was left as the shipped model saw it. After the fix 06-25 is still thin in the source (31% of departures matched). Commands: `bash cluster/final_refix.sh`, then the
+laptop assembly and checks above.
 
 ### 8.4 The file
 
-| file | built by | SHA-256 (as built 2026-10-09) | status |
+| file | built by | SHA-256 | status |
 |---|---|---|---|
-| `understanding-accordion_final.parquet` | `PRC_RANKING=final python assemble.py --arm-u UT --lobt-window --join-complement --out final` | `35afc1c1351cf8756c884f1974b8e1b8f72a1d76329082bd40705efe277ca6d0` | built and checked 2026-10-09; to be uploaded before the deadline |
+| `understanding-accordion_final.parquet` | `PRC_RANKING=final python assemble.py --arm-u UT --lobt-window --join-complement --out final` | `86e0a45c51d2da1064f3a76e8f712a6a938cff192aae3500d8db11a6858b473a` | uploaded 2026-10-12 16:50 UTC (after the ADS-B fix); bucket copy read back identical |

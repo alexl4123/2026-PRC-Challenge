@@ -52,7 +52,7 @@ Related documents: the model is described in [MODEL.md](MODEL.md), the validatio
 - **v29** adds three label-free rules for departures without an LOBT (join complement A, B′ and a LEBL/LEMD cap C),
   found post hoc on 2025 by our own structure search. In 2026 they moved 36 other rows (label-free); live −0.50.
 - **Final phase:** one blind file on January, February, June and July 2026, the v29 design rebuilt end to end;
-  built and checked on 2026-10-09, to be uploaded before 2026-10-14 10:00 UTC (§8).
+  uploaded 2026-10-12, after an ADS-B extraction fix on four of its days (§8).
 
 ## Terms
 
@@ -599,6 +599,8 @@ trailers.
   (`PRC_RANKING=final`), with no model, weight or rule change. Build and checks are in
   [REPRODUCE.md §8](REPRODUCE.md#8-final-phase-rebuild-on-the-final-ranking-file).
 - **Checks** *(label-free)*: valid, 670,790 rows; on the 344,841 January/July departures shared with v29 the
-  predictions differ by 15.95 s RMS (routes A/B/C 9.99 s, route D outside zone P 42.1 s, zone P 166.4 s; 0.23% of
+  predictions differ by 16.11 s RMS (routes A/B/C 10.24 s, route D outside zone P 42.2 s, zone P 166.4 s; 0.25% of
   rows by more than 60 s). The join complement moved 52 rows in the final file.
-- **Status.** Built and checked on 2026-10-09; to be uploaded before the deadline. It has no public score.
+- **ADS-B fix.** Four days re-extracted after a silent short read; 11,350 predictions changed, 11,328 of them on those days
+  ([VALIDATION.md](VALIDATION.md) §8).
+- **Status.** Uploaded 2026-10-12 16:50 UTC, replacing a safety-net upload of the pre-fix build made on 2026-10-10; read back byte-identical. The scorer accepted all 670,790 departures and returns no score.

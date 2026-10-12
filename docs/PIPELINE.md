@@ -134,6 +134,7 @@ repository: 2026-10-14 10:00 UTC. Commands and checks: [REPRODUCE.md](REPRODUCE.
 | `tools/make_final_cache.py` | laptop | training-side mirror of `cache/` (symlinks and copies; ranking-derived files skipped) |
 | `prc/io.py`, `experiments/v11/v11_features.py` | laptop | `ranking.parquet`, `v11/feat_ranking.parquet` |
 | `bash cluster/final_phase.sh` | cluster | adsb.lol stage 1 (58 Feb/Jun days) and stage 2, `adsb2_final/`, `w2_final/`, `nn_final/`, `seq_<V>_final/`, `seq_final/` (seq and seqnc), all chained |
+| `bash cluster/final_refix.sh` | cluster | (2026-10-10) re-extracts the four short-read days with the fixed stage 1, moves the old outputs aside, rebuilds the ranking-side adsb.lol features and refits `adsb2_final/` and every `seq_*_final/` |
 | `experiments/exp65_submit_v8.py --stage components` | laptop | `final/lgb_components.npz` |
 | `experiments/final/f01_spec_x.py` | laptop | `final/spec_x_ranking.npz`, `exp62_cand_ranking.parquet` |
 | `experiments/major/m00_base.py`, `m11_state_features.py` | laptop | `major/dep_ranking.parquet`, `major/m11_state_ranking.parquet` |

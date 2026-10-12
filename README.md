@@ -260,11 +260,14 @@ re-dithered. The design must not change. The deadline for the file and for this 
 - **New inputs.** adsb.lol days for February and June 2026 (58 days). Every component that depends on the ranking file
   was refitted on 2025 and re-predicted.
 - **Checks** *(label-free)*. In initial mode the rebuilt steps reproduce the shipped components exactly. On the
-  344,841 January/July departures the final file shares with v29, the predictions differ by 15.95 s RMS (against
+  344,841 January/July departures the final file shares with v29, the predictions differ by 16.11 s RMS (against
   v29's live RMSE of 234.90 s), about half of it in zone P. The re-dither moves movement times by up to ±12 s and
   leaves the flight-plan clocks unchanged, so the 3606 s window still holds; the 99 rows moved by v28/v29 are rebuilt
   by the same rules, not copied.
-- **Status.** Built and checked on 2026-10-09; to be uploaded before the deadline.
+- **ADS-B fix.** Four adsb.lol days of the final file had been read only in part (a silent stop of Python's tar reader
+  at a damaged archive header); they were re-extracted with a fixed reader and the ADS-B-dependent components refitted
+  before upload ([docs/VALIDATION.md](docs/VALIDATION.md) §8).
+- **Status.** Uploaded 2026-10-12 16:50 UTC, replacing a safety-net upload of the pre-fix build made on 2026-10-10; read back byte-identical. The scorer accepted all 670,790 departures and returns no score.
 
 ## Repository layout
 
