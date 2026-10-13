@@ -498,7 +498,7 @@ January-July 2026, so it summarises the labels we are scored on. Dates are 2026,
   TabICL on Rome's 627 zone-P rows of 2025; v25 on `experiments/tail/t06_carrier_stamp.py` (2025; rule failed) and
   `t07_carrier_checks.py` (descriptive checks on 2025 and label-free 2026). Neither our dev logs nor these scripts
   refer to the published Rome counts. That does not rule out an indirect influence of the 09-23 report on where we
-  spent effort.
+  spent effort. One coincidence a reader may notice: v13's expected numbers of Rome zone-P tails (the summed probabilities, about 42 for January and 72 for July 2026) are close to the published Rome counts of taxi-outs over 120 min quoted on 09-23 (44 and 75). Those counts were not used by v13 or by any later build; a calibrated classifier is expected to land near the true count.
 - **09-26 to 09-28.** Research passes flagged the file again; it was not opened. We recorded an organiser answer on
   the challenge Discord (2026-09-28) allowing the published monthly averages; the team kept its rule (re-confirmed
   10-06).
