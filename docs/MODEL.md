@@ -591,12 +591,15 @@ route-D departures the second case can be read off the file: their flight's NM r
   0 inside ±3,606 s; 70 one-sided rows, all above `hi`.
 - **B′ (two-sided, lower side).** Where both sides are possible, `MVT − SCHED` lies in [`lo`, `hi`] and the take-off
   does not cross local midnight relative to the schedule: `q = min(p, floor(max(lo, 0)))`. In 2025, all 1,281 such
-  rows lie below `lo`. This is an empirical regularity, not a forced identity.
+  rows lie below `lo` (1,296 of 1,296 before the midnight exclusion). This is an empirical regularity, not a forced
+  identity. The midnight exclusion was added after the one 2026 row it removes had been inspected.
+- **Origin.** The rules came from a structure search on 2025 and on label-free 2026 rows, with candidates priced
+  against v28's live score; 3 shipped ([../experiments/hunt_1006/](../experiments/hunt_1006/README.md)).
 - **C (source cap).** LEBL and LEMD record no departure taxi above 3,606 s (2025: 0 of 391,947 rows; maximum 3,604 and
   3,598 s, while the other airports exceed it): `q = min(q, 3606)`.
 
-**Effect [label-free].** 36 rows move in 2026: 9 up by A, 21 down by B′, 6 down by C, none of them among the 63 window
-rows. The build aborts unless the 2025 self-tests hold and the 2026 file passes three label-free checks: clean links
+**Effect [label-free].** 36 rows move in 2026: 9 up by A, 21 down by B′, 6 down by C alone (C touches 10 rows, 4 of
+which A or B′ already moved), none of them among the 63 window rows. The build aborts unless the 2025 self-tests hold and the 2026 file passes three label-free checks: clean links
 are 5–10% of IFR departures without an LOBT (6.8%), arrival NM coverage is at least 99%, and no moved row lies on an
 airport-day whose no-record share exceeds the 2025 maximum. If the rules hold, the score is at most 235.023 (−0.377 s
 from v28's live score); about 60% of the squared moves sit on one Rome row. On 2025 out-of-fold predictions
@@ -723,9 +726,10 @@ post hoc, each with its rule frozen before its evaluation run; blend weights are
 applied with a shared production classifier (§7.1); two congestion features normalise by the airport median of the
 file they are computed on (12 months in training, January + July in ranking), a small train/serve inconsistency.
 
-**Reproducibility.** Neural-network refits on GPU are not bit-identical, so the submission is reproduced exactly from
-the stored components ([REPRODUCE.md](REPRODUCE.md)); the `seqnc` final fits used by v27–v29 ran on CPU in fp32
-(§7.3).
+**Reproducibility.** Re-running a job on the same hardware with the same seed reproduced its outputs (measured in the
+final phase, [REPRODUCE.md](REPRODUCE.md) §2.6); across hardware or library versions GPU fits in bf16 are not
+bit-identical in general, so the submission is reproduced exactly from the stored components; the `seqnc` final fits
+used by v27–v29 ran on CPU in fp32 (§7.3), those of the final file on GPU in bf16.
 
 **Purpose.** Because it uses look-ahead and own-track features, this is a post-operations estimator. It cannot be used
 tactically before off-block.
@@ -761,17 +765,19 @@ These come from the provided 2025 files, and from non-label fields of the 2026 f
 
 ## 14. How this was built, and credits
 
-**How this was built.** The team took the decisions: which data to use or refuse, what to test, every upload, and
-every exception to our own rules. Code and analysis were written with an AI coding assistant (Anthropic's Claude,
-through Claude Code); the commits carry `Co-Authored-By` trailers. Experiments are numbered scripts that state their
+**How this was built.** One author, Alexander Beiser (TU Wien), took the decisions: which data to use or refuse, what
+to test, every upload, and every exception to our own rules. Code, analysis and documentation were produced with a
+multi-agent Claude Code workflow (Anthropic's Claude); the README states the workflow and the upload approvals, and
+every commit carries a `Co-Authored-By` trailer. Experiments are numbered scripts that state their
 question in the header and, from the member retrain of 2026-09-24 onward, their decision rule as well. Where a rule
 was committed on its own, the commit order is consistent with it having been written before the evaluation run
 (commit times alone do not prove it; [VALIDATION.md](VALIDATION.md) §5.3 lists the cases where rule and result share
 a commit). The exceptions to rule-gated shipping are listed in §11.4: v1–v5 predate written rules (v1/v2 were a
 paired leaderboard test), v7 and v10 were leaderboard tests, v18 used a live check, v25 overrode the rule, the v28
-header was written after its 2025 effect had been measured, and the v29 rules were found post hoc (§10.1). The full
-experiment history, with every measured result, is kept in an internal date-stamped log that is not part of this
-repository; the numbers here are copied from it and from the scripts' outputs.
+header was written after its 2025 effect had been measured, and the v29 rules came from a structure search on 2025 and
+on label-free 2026 rows, with candidates priced against v28's live score (§10.1). The full experiment history, with
+every measured result, is kept in an internal date-stamped log that is not part of this repository (available to the
+organisers on request); the numbers here are copied from it and from the scripts' outputs.
 
 **Credits.** The LOBT window idea comes from the three public repositories named in §10 (ideas only; the code here is
 our own). The wake-sequence question comes from the organisers and a participant on the challenge Discord (§6.1), and
@@ -786,9 +792,10 @@ the README.
 
 On 2026-10-09 the organisers announced one blind final submission on `final_ranking.parquet`: January, February, June
 and July 2026, 670,790 departures, with the January and July times re-dithered; the design must not change. Our final
-file is the v29 design rebuilt end to end on that file, with no model, weight or rule change: every 2025-trained
-component that predicts the ranking file was refitted and re-predicted, with adsb.lol extended to February and June
-2026 ([REPRODUCE.md §8](REPRODUCE.md#8-final-phase-rebuild-on-the-final-ranking-file)).
+file is the v29 design re-run on that file, with no model, weight or rule change: we re-ran the frozen fit-and-predict
+jobs on the unchanged 2025 training data with the same seeds, with adsb.lol extended to February and June 2026
+([REPRODUCE.md §8](REPRODUCE.md#8-final-phase-rebuild-on-the-final-ranking-file); §8.5 lists every difference from the
+v29 build).
 
 - **Re-dither [label-free].** Between the two files, January/July movement times (and arrival in-block times) differ
   by a triangular ±12 s distribution, two independent ±6 s integer dithers; `SCHED`, `LOBT`, `IOBT`, `EOBT` and
@@ -798,7 +805,8 @@ component that predicts the ranking file was refitted and re-predicted, with ads
   edge moves with its take-off time. Nothing was edited by hand. In the final file the join complement moves 52 rows.
 - **Agreement with v29 [label-free].** On the 344,841 shared January/July departures the predictions differ by 16.11 s
   RMS (A/B/C 10.24 s, route D outside P 42.2 s, zone P 166.4 s); 82% of the zone-P difference is at Rome, where the
-  TabICL probabilities moved (median 0, 90th percentile 0.027).
+  TabICL probabilities moved (median 0, 90th percentile 0.027). The difference is not fully decomposed; REPRODUCE §8.5
+  lists the known contributors.
 - **New months [label-free].** Mean prediction February 988 s and June 989 s, against 2025 mean labels of 1,002 s and
   973 s for the same months.
-- **adsb.lol short reads, fixed before upload.** On 2026-10-10 we found that stage 1 had read only the first 2 GB part of five adsb.lol "staging" archives (2025-10-14, 2026-01-29, 06-07, 06-23, 06-25): Python's stream tar reader stops silently at a damaged header, and each of these archives has one (35-76 KB) just past the part boundary. Stage 1 now uses its own resynchronising reader (`iter_tar`), fails loudly on any unread remainder, and drops exact duplicate rows (these archives repeat their first part). The four final-file days were re-extracted and every ADS-B-dependent component refitted: 11,350 of 670,790 predictions changed, 11,328 of them on those days (6.6 s RMS over the file). The training day 2025-10-14 (0.3% of training departures) was left as the shipped model saw it. After the fix 06-25 is still thin in the source (31% of departures matched). Details: [VALIDATION.md](VALIDATION.md) §8.
+- **adsb.lol short reads, fixed before upload.** On 2026-10-10 we found that stage 1 had read only the first 2 GB part of five adsb.lol "staging" archives (2025-10-14, 2026-01-29, 06-07, 06-23, 06-25): Python's stream tar reader stops silently at a damaged header, and each of these archives has one (35-76 KB) just past the part boundary. Stage 1 now uses its own resynchronising reader (`iter_tar`), fails loudly on any unread remainder, and drops exact duplicate rows (these archives repeat their first part). The four final-file days were re-extracted and every ADS-B-dependent job re-run: 11,350 of 670,790 predictions changed, 11,328 of them on those days (6.6 s RMS over the file). The training day 2025-10-14 (0.3% of training departures) was left as the shipped model saw it. After the fix 06-25 is still thin in the source (31% of departures matched). Details: [VALIDATION.md](VALIDATION.md) §8.

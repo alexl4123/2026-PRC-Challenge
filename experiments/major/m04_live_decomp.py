@@ -1,7 +1,8 @@
 """m04 -- how big is our 2026 BULK error? Estimated from submissions we already made.
 
-DIAGNOSTIC ONLY. No new submission, no probe; it reads the live scores of v7/v8/v9
-(already on the board) and asks what they imply about where our 2026 SSE lives.
+DIAGNOSTIC ONLY. No new submission; it uses 2026 labels only through our own public scores
+(the live scores of v7/v8/v9
+already on the board) and asks what they imply about where our 2026 SSE lives.
 
 For two submissions a, b differing by delta = b - a on rows K:
     SSE_b = SSE_a - 2 sum_K r_a*delta + sum_K delta^2        (r_a = y - a)

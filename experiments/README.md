@@ -1,8 +1,14 @@
 # experiments/
 
-This folder holds every experiment we ran, kept as it was run. There are two kinds:
+This folder holds the experiment scripts we ran, kept as they were run. There are two kinds:
 - **numbered scripts**, `exp01`-`exp82` (2026-09-21 to 2026-09-28);
-- **22 topic folders**, one per study.
+- **25 topic folders**, one per study. Three of them (`hunt_1006/`, `plan_1006/`, `final_1013/`) were copied on
+  2026-10-13 from git-ignored scratch folders, so that the scripts behind v28, v29 and the last checks are in the
+  repository.
+
+What is not here: one-off commands typed in interactive sessions (for example the extraction of the ATFM file and the
+saving of `cache/blend_oof_mix_nn3.npy`, both documented in [../docs/REPRODUCE.md](../docs/REPRODUCE.md)), scratch
+scripts of agent sessions other than the three folders above, and every output or data file.
 
 Each script's header states the question, the protocol and, where one applies, the decision rule written before the
 run. Many headers also record the result. The upload-by-upload outcomes are collected in
@@ -15,8 +21,8 @@ are needed; everything else is a screen, a diagnostic or a dead end.
   repository in the form in which they were run.
 - **Some cannot be run as they stand.** Some exploratory scripts read caches written in a scratch directory that is
   not published, and some still carry absolute paths of the machine they ran on (in particular `ideas_inside/`,
-  `ideas_outside2/`, `review_inside/`, `review_outside2/`, `deice_0926/`, `discord_eval/`, `ground_sources/` and
-  `plan_1001/live_proj.py`). The scripts on the production path resolve their paths portably; a few still show the
+  `ideas_outside2/`, `review_inside/`, `review_outside2/`, `deice_0926/`, `discord_eval/`, `ground_sources/`,
+  `plan_1001/live_proj.py`, `hunt_1006/`, `plan_1006/` and `final_1013/`). Paths are as run; adapt them to your clone. The scripts on the production path resolve their paths portably; a few still show the
   development machine's interpreter path in a usage comment.
 
 ## Production path: what built v29
@@ -53,7 +59,8 @@ gives the commands.
   features, and `final/f02_check_final.py` for the pre-upload checks ([../docs/REPRODUCE.md](../docs/REPRODUCE.md) §8).
 - **How the seqnc finals were run.** For v27-v29, the three `seqnc` finals were run with
   `cluster/seq_final.py --no-context --device cpu` on a laptop CPU in fp32. The fold fits used by the evaluation ran on
-  GPU with bf16 autocast. It is the same model on a slightly different numeric path.
+  GPU with bf16 autocast. It is the same model on a slightly different numeric path. For the final file they were
+  run by the documented GPU job ([../docs/REPRODUCE.md](../docs/REPRODUCE.md) §8.5).
 - **Frozen inputs of the evaluation scripts.** Steps 18 and 19 also read older out-of-fold caches for the parts of
   the structure they hold fixed:
   - the v9 and v11 stand-ins (`major/m01_anatomy.py`, `strategy/s13_v11_anatomy.py`, `v11/v11_base.py`);
@@ -97,11 +104,14 @@ From v11 to v26, each submission was built as an edit of an earlier file (builde
 | `drivers_0926/` | 09-26 | decomposition of the v17-structure out-of-fold error (cells, day-scale label artefacts, label-free 2026 mix); `d01_rows.py` is reused by the block bootstrap; `lb_snapshot.py` is read-only public API | diagnostic, one production helper |
 | `eurocontrol/` | 10-09 | `ec01_value.py`: value of EUROCONTROL's monthly taxi-out file as a per-airport-month calibration, measured on the 2025 analogue (2025 file against our 2025 out-of-fold predictions); every variant worse on the held-out months; not used | screen |
 | `final/` | 10-09 | final phase: `f01_spec_x.py` (zone-P specialist and candidate features on the final file, with an initial-mode regression check) and `f02_check_final.py` (pre-upload checks of the final file) | production |
+| `final_1013/` | 10-13 | last checks before the deadline: 13 assembly-level candidates on the 2025 out-of-fold predictions under a pre-registration with three post-hoc addenda (none shipped), and label-free audits of the final file's inputs and outputs (one more adsb.lol extraction failure, 2026-06-06); see its README | screens, audit |
 | `ground_sources/` | 09-27 | search for open ground surveillance at the ten airports (readsb snapshots and traces, OPDI surface-event counts); nothing usable at LTFM or LFPG | screen |
+| `hunt_1006/` | 10-06 | the structure search that produced v29: 111 scripts on 2025 and on label-free 2026 rows, candidates priced against v28's live score; A, B′ and C shipped, E1, B2, the DST window, twin rules T3/T4 and Rome hedges dropped; see its README | search behind v29 |
 | `ideas_inside/` | 09-23 | diagnostics `diag_a`-`diag_s` on ideas from inside the data (which clock BLOCK matches, stamping propensity, flight identity, target forms, a P2 specialist); the stack precursor of v11 | screen; needs scratch caches |
 | `ideas_outside2/` | 09-23 | screens of outside ideas on the v6 residual: stand turnover (later in v11), runway configuration, flight-level queue position, OSM stands, revision of off-block estimates, per-airport stacking | screen; absolute paths |
 | `major/` | 09-24 | "major levers" study on the v9 stand-in: error anatomy and oracles, leak checks of row order and IDs, year-ahead tests on the 2026 arrivals (provided data), the January 2026 disruption, and the route-D state corrector (`m11*`, shipped since v10) | production (`m00`, `m11`, `m11d`, `m11f`) and diagnostics |
 | `plan_1001/` | 10-01 | read-only post-hoc screens of the 10-01 planning round: disagreement-tercile weights (arm U) found here, skeptic re-checks, gap anatomy, `live_proj.py` (diagnostic on our own live scores) | screen |
+| `plan_1006/` | 10-06 | the planning round that led to v28: LOBT-window checks on 2025 and on v27 (label-free), one inspected 2026 row, the value of a perfect airport-month correction (2025), and `pattern.py`, a profile of other teams' public upload timing that fed no decision; see its README | search behind v28 |
 | `research_0925/` | 09-25 | v15 error anatomy, CatBoost screen (weight 0), calibration of large predictions, Rome day-shift label artefacts (priced, not shipped), board cut-off analysis from the public API | screen |
 | `review_inside/` | 09-23 | reviewer re-checks of the `ideas_inside` results | screen; needs scratch caches |
 | `review_outside2/` | 09-23 | reviewer re-checks of the `ideas_outside2` results (per-airport member, stand family rebuilt) | screen; needs scratch caches |
@@ -153,6 +163,10 @@ From v11 to v26, each submission was built as an edit of an earlier file (builde
   - `C1`: a consolidated retrain with de-icing shares (failed);
   - `seq`/`seqnc`: the set model and its no-context twin;
   - `bet D`: the seq model's working name.
+- **"bet" in code and logs:** a pre-registered experiment (rule written before the run). The 10-06 search that
+  produced v29 was not one; it is called "structure hunt" in some comments and "structure search" in the documents.
+- **Internal references:** code comments cite an internal dev log (`claude_log/...`, "dev log §N") and internal
+  reports (`reports/...`). They are not published; they are available to the organisers on request.
 - **"LEADERBOARD TEST" and "LIVE CALIBRATION" in a header:** an upload made as a model-level test (v7, v10), or a
   script that uses our own live scores (`routed_0926/r03_calibrate.py`). Both are disclosed in the README and in
   [../docs/VALIDATION.md](../docs/VALIDATION.md).

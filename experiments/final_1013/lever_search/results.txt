@@ -1,0 +1,52 @@
+== K1 airport x route shift: rows changed 0
+  12m +0.0000 date-CI [+0.0000,+0.0000] aptday-CI [+0.0000,+0.0000] | J+J +0.0000 [+0.0000,+0.0000] | Jan +0.0000 Jul +0.0000 | months better 0/12 | w/o top100 +0.0000
+  per month +0.000 +0.000 +0.000 +0.000 +0.000 +0.000 +0.000 +0.000 +0.000 +0.000 +0.000 +0.000
+  R1 False R2 False R3 False R4 False => FAIL lambda {1: inf, 2: inf, 3: inf, 4: inf, 5: inf, 6: inf, 7: inf, 8: inf, 9: inf, 10: inf, 11: inf, 12: inf}
+== K2 airport x route x hour-band shift: rows changed 0
+  12m +0.0000 date-CI [+0.0000,+0.0000] aptday-CI [+0.0000,+0.0000] | J+J +0.0000 [+0.0000,+0.0000] | Jan +0.0000 Jul +0.0000 | months better 0/12 | w/o top100 +0.0000
+  per month +0.000 +0.000 +0.000 +0.000 +0.000 +0.000 +0.000 +0.000 +0.000 +0.000 +0.000 +0.000
+  R1 False R2 False R3 False R4 False => FAIL lambda {1: inf, 2: inf, 3: inf, 4: inf, 5: inf, 6: inf, 7: inf, 8: inf, 9: inf, 10: inf, 11: inf, 12: inf}
+== K3 LOBT-window margin shift: rows changed 25047
+  12m -0.0076 date-CI [-0.0142,-0.0010] aptday-CI [-0.0139,-0.0011] | J+J -0.0159 [-0.0335,-0.0019] | Jan -0.0072 Jul -0.0247 | months better 8/12 | w/o top100 +0.0076
+  per month -0.007 -0.018 +0.002 -0.022 +0.002 +0.006 -0.025 +0.008 -0.005 -0.030 -0.011 -0.001
+  R1 True R2 True R3 True R4 True => PASS lambda {1: 100.0, 2: 100.0, 3: 100.0, 4: 100.0, 5: 100.0, 6: 100.0, 7: 100.0, 8: 0, 9: 100.0, 10: 100.0, 11: 100.0, 12: 100.0}
+== K4 off_aobt3 soft clip: rows changed 0
+  12m +0.0000 date-CI [+0.0000,+0.0000] aptday-CI [+0.0000,+0.0000] | J+J +0.0000 [+0.0000,+0.0000] | Jan +0.0000 Jul +0.0000 | months better 0/12 | w/o top100 +0.0000
+  per month +0.000 +0.000 +0.000 +0.000 +0.000 +0.000 +0.000 +0.000 +0.000 +0.000 +0.000 +0.000
+  R1 False R2 False R3 False R4 False => FAIL (c_lo,c_hi,innerLOMO dSSE lo,hi) {1: (inf, inf, np.float64(0.0), np.float64(0.0)), 2: (inf, inf, np.float64(0.0), np.float64(0.0)), 3: (inf, inf, np.float64(0.0), np.float64(0.0)), 4: (inf, inf, np.float64(0.0), np.float64(0.0)), 5: (inf, inf, np.float64(0.0), np.float64(0.0)), 6: (inf, inf, np.float64(0.0), np.float64(0.0)), 7: (inf, inf, np.float64(0.0), np.float64(0.0)), 8: (inf, inf, np.float64(0.0), np.float64(0.0)), 9: (inf, inf, np.float64(0.0), np.float64(0.0)), 10: (inf, inf, np.float64(0.0), np.float64(0.0)), 11: (inf, inf, np.float64(0.0), np.float64(0.0)), 12: (inf, inf, np.float64(0.0), np.float64(0.0))}
+== K5 zone-P logit recalibration: rows changed 4925
+  12m +0.7549 date-CI [+0.0690,+1.4942] aptday-CI [-0.0299,+1.5471] | J+J +2.0528 [+0.2070,+4.4884] | Jan -0.5452 Jul +4.6143 | months better 5/12 | w/o top100 +1.8843
+  per month -0.545 +1.093 +0.968 -0.085 -0.150 -1.037 +4.614 +3.198 +1.785 +0.150 -2.407 +0.504
+  R1 False R2 False R3 False R4 False => FAIL (rome (a,b), nonrome (a,b)) {1: ((np.float64(1.5), np.float64(-0.25)), (np.float64(0.5), np.float64(-1.5))), 2: ((np.float64(1.7), np.float64(-0.5)), (np.float64(0.6), np.float64(-1.5))), 3: ((np.float64(1.9), np.float64(-0.75)), (np.float64(0.5), np.float64(-1.5))), 4: ((np.float64(1.6), np.float64(-0.25)), (np.float64(0.6), np.float64(-1.0))), 5: ((np.float64(1.6), np.float64(-0.25)), (np.float64(0.6), np.float64(-1.0))), 6: ((np.float64(1.7), np.float64(-0.5)), (np.float64(0.5), np.float64(-1.5))), 7: ((np.float64(1.5), np.float64(0.5)), (np.float64(0.5), np.float64(-1.5))), 8: ((np.float64(2.0), np.float64(-0.5)), (np.float64(0.5), np.float64(-1.5))), 9: ((np.float64(1.7), np.float64(-1.0)), (np.float64(0.5), np.float64(-1.5))), 10: ((np.float64(1.7), np.float64(-0.5)), (np.float64(0.5), np.float64(-1.5))), 11: ((np.float64(1.4), np.float64(-0.25)), (np.float64(0.5), np.float64(-1.5))), 12: ((np.float64(1.7), np.float64(-0.5)), (np.float64(0.6), np.float64(-1.0)))}
+== K6 per-airport floor: rows changed 31
+  12m -0.0013 date-CI [-0.0031,-0.0001] aptday-CI [-0.0028,-0.0001] | J+J -0.0012 [-0.0046,+0.0001] | Jan +0.0001 Jul -0.0025 | months better 7/12 | w/o top100 +0.0001
+  per month +0.000 +0.000 -0.003 -0.000 -0.000 +0.000 -0.003 -0.004 -0.007 +0.001 -0.000 +0.000
+  R1 True R2 True R3 False R4 False => FAIL alpha {1: 0.001, 2: 0.001, 3: 0.001, 4: 0.001, 5: 0.001, 6: 0.001, 7: 0.001, 8: 0.001, 9: 0.001, 10: 0.001, 11: 0.001, 12: 0.001}
+== K8 A/B/C U+T refit on 11 months: rows changed 1469734
+  12m +0.0958 date-CI [+0.0745,+0.1173] aptday-CI [+0.0747,+0.1201] | J+J +0.0835 [+0.0547,+0.1288] | Jan +0.1275 Jul +0.0408 | months better 1/12 | w/o top100 +0.1375
+  per month +0.127 -0.033 +0.092 +0.147 +0.028 +0.052 +0.041 +0.156 +0.117 +0.130 +0.122 +0.283
+  R1 False R2 False R3 False R4 False => FAIL weights m1: (array([0.   , 0.   , 0.402, 0.   , 0.   , 0.128, 0.109, 0.361]), 0.121) (array([0.   , 0.   , 0.219, 0.   , 0.012, 0.123, 0.019, 0.627]), 0.179) (array([0.   , 0.   , 0.   , 0.   , 0.234, 0.046, 0.105, 0.623]), 0.263)
+== K9 route-D NNLS refit 11 months: rows changed 17165
+  12m +0.0260 date-CI [-0.0393,+0.0947] aptday-CI [-0.0408,+0.0953] | J+J +0.1097 [-0.0275,+0.2804] | Jan -0.0311 Jul +0.2499 | months better 6/12 | w/o top100 +0.2062
+  per month -0.031 -0.216 -0.068 -0.016 -0.041 +0.054 +0.250 +0.012 +0.019 -0.050 +0.042 +0.334
+  R1 False R2 False R3 False R4 False => FAIL weights m1 [0.    0.    0.    0.    0.603 0.    0.008 0.426] m7 [0.    0.    0.    0.    0.584 0.    0.    0.464]
+== K7 route-D refit + schedule-anchor column: rows changed 17168
+  12m +0.0310 date-CI [-0.0334,+0.0997] aptday-CI [-0.0326,+0.0982] | J+J +0.1097 [-0.0275,+0.2804] | Jan -0.0311 Jul +0.2499 | months better 5/12 | w/o top100 +0.2063
+  per month -0.031 -0.216 -0.068 -0.016 +0.007 +0.054 +0.250 +0.012 +0.019 -0.050 +0.042 +0.334
+  R1 False R2 False R3 False R4 False => FAIL weights m1 [0.    0.    0.    0.    0.603 0.    0.008 0.426 0.   ] m7 [0.    0.    0.    0.    0.584 0.    0.    0.464 0.   ]
+== K10 zone-P corrector multiplier: rows changed 4228
+  12m +0.0246 date-CI [-0.0918,+0.1853] aptday-CI [-0.0848,+0.1719] | J+J -0.0914 [-0.2524,+0.0152] | Jan -0.1451 Jul -0.0392 | months better 10/12 | w/o top100 +0.1256
+  per month -0.145 +1.362 -0.045 +0.007 -0.016 -0.041 -0.039 -0.049 -0.041 -0.174 -0.194 -0.145
+  R1 False R2 True R3 True R4 True => FAIL chosen {1: 0.75, 2: 0.5, 3: 0.75, 4: 0.75, 5: 0.75, 6: 0.75, 7: 0.75, 8: 0.75, 9: 0.75, 10: 0.75, 11: 0.75, 12: 0.75}
+== K11 route-D corrector multiplier: rows changed 16381
+  12m -0.0311 date-CI [-0.1547,+0.0970] aptday-CI [-0.1467,+0.1007] | J+J -0.0576 [-0.2190,+0.1131] | Jan -0.1178 Jul +0.0013 | months better 8/12 | w/o top100 +0.1712
+  per month -0.118 +0.900 +0.014 +0.052 -0.312 -0.138 +0.001 -0.181 -0.091 -0.047 -0.003 -0.179
+  R1 False R2 True R3 False R4 True => FAIL chosen {1: 0.25, 2: 0, 3: 0.25, 4: 0.25, 5: 0.25, 6: 0.25, 7: 0.25, 8: 0.25, 9: 0.25, 10: 0.25, 11: 0.25, 12: 0.25}
+== K3b off_lobt>3606 bucket shift: rows changed 23701
+  12m -0.0832 date-CI [-0.1396,-0.0311] aptday-CI [-0.1399,-0.0342] | J+J -0.1658 [-0.3544,-0.0101] | Jan -0.0800 Jul -0.2523 | months better 10/12 | w/o top100 +0.0667
+  per month -0.080 -0.180 -0.085 -0.004 -0.075 +0.014 -0.252 -0.080 -0.075 -0.175 +0.034 -0.010
+  R1 True R2 True R3 True R4 True => PASS lambda {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0}
+== K3c isotonic residual in off_lobt (>3606): rows changed 28925
+  12m -0.0925 date-CI [-0.1624,-0.0233] aptday-CI [-0.1652,-0.0242] | J+J -0.1786 [-0.4337,+0.0401] | Jan -0.0612 Jul -0.2964 | months better 11/12 | w/o top100 +0.0918
+  per month -0.061 -0.131 -0.155 -0.008 -0.059 -0.006 -0.296 -0.090 -0.101 -0.202 +0.035 -0.014
+  R1 True R2 True R3 True R4 True => PASS 

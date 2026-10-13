@@ -40,8 +40,9 @@ closed formula per row group:
   route-D departure whose own NM record appears on its destination's arrival row (so its own join failed) to the upper
   edge of that arrival's LOBT window, where the lower side is impossible; B′ lowers the two-sided cases to the lower edge (stamping and
   local-midnight cases excluded); C caps LEBL and LEMD at 3,606 s. Each rule is re-measured on 2025 before every build,
-  and label-free 2026 checks must pass. In 2026 they moved 36 rows of v28 (label-free). Found post hoc by a structure
-  search on 2025; see [MODEL.md](MODEL.md) §10.1.
+  and label-free 2026 checks must pass. In 2026 they moved 36 rows of v28 (label-free). From a structure search on 2025
+  and on label-free 2026 rows, with candidates priced against v28's live score; 3 shipped; see [MODEL.md](MODEL.md)
+  §10.1 and `experiments/hunt_1006/`.
 - Equivalence: `--check 24` and `--arm-u U --check 26` reproduce the shipped v24/v26 exactly on routes A/B/C and
   route D; zone P differs by at most 2 s (rounding accumulated by the old build chain, in which every submission
   was an edit of the previous one). `--arm-u UT --check 27` and `--arm-u UT --lobt-window --check 28` reproduce v27
@@ -103,7 +104,7 @@ scored better, held-out airport x local-day block-bootstrap 95% interval below 0
 seed better, and the gain not carried by the 100 most-improved rows (R1-R5; from 10-02 also X1/X2); earlier versions
 were judged by simpler rules. Uploads not decided by such a rule (the leaderboard tests v1/v2, v7 and v10, the v18
 tie-break, the v25 override, the v28 window, whose header was written after its 2025 effect was measured, and the v29
-rules, found post hoc) are set
+rules, from a structure search on 2025 and label-free 2026 rows) are set
 out in [VALIDATION.md](VALIDATION.md). The scripts are under `experiments/` (`seq/seq_swap_eval.py`, `seq/arm_u_eval.py`,
 `adsb/a3_eval.py`, ...); every result was recorded in an internal experiment log (not published), and
 [RESULTS.md](RESULTS.md) reports them upload by upload.
@@ -134,7 +135,7 @@ repository: 2026-10-14 10:00 UTC. Commands and checks: [REPRODUCE.md](REPRODUCE.
 | `tools/make_final_cache.py` | laptop | training-side mirror of `cache/` (symlinks and copies; ranking-derived files skipped) |
 | `prc/io.py`, `experiments/v11/v11_features.py` | laptop | `ranking.parquet`, `v11/feat_ranking.parquet` |
 | `bash cluster/final_phase.sh` | cluster | adsb.lol stage 1 (58 Feb/Jun days) and stage 2, `adsb2_final/`, `w2_final/`, `nn_final/`, `seq_<V>_final/`, `seq_final/` (seq and seqnc), all chained |
-| `bash cluster/final_refix.sh` | cluster | (2026-10-10) re-extracts the four short-read days with the fixed stage 1, moves the old outputs aside, rebuilds the ranking-side adsb.lol features and refits `adsb2_final/` and every `seq_*_final/` |
+| `bash cluster/final_refix.sh` | cluster | (2026-10-10) re-extracts the four short-read days with the fixed stage 1, moves the old outputs aside, rebuilds the ranking-side adsb.lol features and re-runs the `adsb2_final/` and every `seq_*_final/` job; `REFIX_DAYS`/`REFIX_IDX`/`REFIX_TAG` allow a second round (REPRODUCE §8.5) |
 | `experiments/exp65_submit_v8.py --stage components` | laptop | `final/lgb_components.npz` |
 | `experiments/final/f01_spec_x.py` | laptop | `final/spec_x_ranking.npz`, `exp62_cand_ranking.parquet` |
 | `experiments/major/m00_base.py`, `m11_state_features.py` | laptop | `major/dep_ranking.parquet`, `major/m11_state_ranking.parquet` |

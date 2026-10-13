@@ -1,7 +1,8 @@
 # Python environment of team understanding-accordion, PRC Data Challenge 2026.
 #
-# These are the versions of the laptop environment that built and checked the shipped files v24-v28
-# (CPython 3.12.3 on Ubuntu 24.04; `pip freeze` taken 2026-10-06). Install with
+# These are the versions of the laptop environment that built and checked the shipped files v24-v29 and the
+# final-phase file (CPython 3.12.3 on Ubuntu 24.04; `pip freeze` taken 2026-10-06). Only this laptop environment is
+# pinned. Install with
 #     python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
 # The cluster environments (cluster/setup_env.sh for CPU jobs, cluster/setup_env_gpu.sh for GPU jobs) were
 # created with unpinned `pip install` in September 2026; their exact versions were not recorded.
@@ -42,10 +43,10 @@ matplotlib==3.11.2
 boto3==1.43.98
 
 # --- NOT part of the laptop environment; install only if you need the script named -----------------------
-# experiments/strategy/s21_tfm_P_final.py imports TabPFN unconditionally (it was run with TabPFN 9.0.0
-# installed outside this environment, TabPFN v2 weights, Prior Labs License 1.1). Its TabPFN output
-# (p_tabpfn) is NOT used by assemble.py; only its TabICL output (p_tabicl) is. Three exploratory TabPFN
-# screens under experiments/strategy/ need it as well.
+# TabPFN is optional. experiments/strategy/s21_tfm_P_final.py computes a TabPFN probability only if tabpfn
+# is installed (the shipped v13-v29 arrays were made with TabPFN 9.0.0 installed outside this environment,
+# TabPFN v2 weights, Prior Labs License 1.1). That output (p_tabpfn) is a diagnostic NOT used by assemble.py; only the TabICL
+# output (p_tabicl) is. Three exploratory TabPFN screens under experiments/strategy/ need it.
 # tabpfn==9.0.0
 # CatBoost is used by cluster/study_task.py (an early model-family study) and four exploratory scripts
 # (experiments/exp42, exp43, exp45, exp48); the shipped blend contains no CatBoost model.

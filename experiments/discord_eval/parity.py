@@ -1,5 +1,5 @@
-"""2025-vs-2026 parity of the new wake and backlog columns (Piyush's distribution check, Discord
-l.504): the same months (January, July) of the training file vs the ranking file, per column, as
+"""2025-vs-2026 parity of the new wake and backlog columns (Piyush Patil's distribution check on
+the challenge Discord): the same months (January, July) of the training file vs the ranking file, per column, as
 a standardised mean shift (mean_2026 - mean_2025) / sd_2025, pooled and worst airport.
 Label-free on both sides.
 

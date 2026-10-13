@@ -47,11 +47,12 @@ LOBT WINDOW (--lobt-window, v28; header written 2026-10-06 BEFORE the build but 
   coverage 98.92% / 98.47%, MVT - LOBT > 3606 s on 2.22% / 2.11% of rows, min MVT - LOBT -3,382 / -3,173 s.
   Credit. The idea was adopted on 2026-10-06 from public competitor repositories (EnioAguiar/prc-taxiout-2026,
   javidmardanov/PRC-Data-Challenge-2026, joris-decombe/taxiout); the code here is our own. Competitors' leaderboard
-  statements are NOT used as evidence. Pre-commitment: upload once; no later upload changes a projected row; nobody derives
-  an implied label from the resulting score.
+  statements are NOT used as evidence. Pre-commitment (on the initial ranking file): upload once; no later upload changes a
+  projected row; nobody derives an implied label from the resulting score.
 
 JOIN COMPLEMENT + SOURCE CAP (--join-complement, v29; header written 2026-10-06 BEFORE the build, AFTER the rules were
-discovered and measured on 2025 by the 10-06 structure hunt -- not pre-registered in the strict sense; disclosed as such).
+discovered and measured by the 10-06 structure search on 2025 and on label-free 2026 rows, with candidates priced against
+v28's live score (experiments/hunt_1006/) -- not pre-registered; disclosed as such).
   Clean link. For a departure d WITHOUT LOBT, IFR, ADES != own airport: the arrival r (same file, ARR phase) with the
   smallest MVT_r - MVT_d in (0, 86400) s, APT_r = ADES_d, ADEP_r = APT_d, FLIGHT_d == FLIGHT_r or FLIGHT_d == CALLSIGN_r,
   LOBT present on r, and r's FLIGHT_ID appearing on no departure row. lo/hi = (MVT_d - LOBT_r) -+ 3606.
@@ -60,16 +61,18 @@ discovered and measured on 2025 by the 10-06 structure hunt -- not pre-registere
     min recorded y is -12), y > hi: q = max(p, ceil(hi)).  2025: 70/70 one-sided rows above hi.
   B' (two-sided, lower side). Where lo >= -12, (MVT_d - SCHED_d) lies in [lo, hi] (a block stamped at the schedule would
     have joined) and the take-off does not cross local midnight relative to the schedule (dloc <= 0, guarding Rome's
-    day-shift class): q = min(p, floor(max(lo, 0))).  EMPIRICAL: 2025 1,296/1,296 below lo, 0 above hi -- not a forced
-    identity.
+    day-shift class): q = min(p, floor(max(lo, 0))).  EMPIRICAL, not a forced identity: 2025 B domain before the
+    midnight guard 1,296/1,296 below lo, 0 above hi; B' rows (dloc <= 0, the self-test count) 1,281/1,281 below lo.
+    The midnight guard was added after inspecting the one 2026 B row that crosses local midnight (hunt_1006/README.md).
   C (source cap). LEBL and LEMD record no departure taxi above 3,606 s (2025: 0 of 391,947; max 3,604 / 3,598; other
     airports exceed it; 2026 arrivals at LEBL/LEMD also stay <= 3,606): q = min(q, 3606).
   Order: v28 (incl. the LOBT window) -> A -> B' -> C. Must not move any of the 63 rows the LOBT window projected (asserted).
   2026 label-free checks (abort if violated): clean-link share of IFR no-LOBT departures in [5%, 10%]; arrival NM coverage
   >= 99%; no moved row on an airport-day whose IFR no-LOBT share exceeds 17.2% (2025 max).  Expected: 36 rows move
-  (9 up by A, 21 down by B', 6 down by C); bound if the rules hold: <= 235.023 from v28's 235.3996 (label-free moves).
-  ~60% of the squared moves sit on one Rome row. Pre-commitment: upload once, score logged only, no implied label, no later
-  upload changes these rows.
+  (9 up by A, 21 down by B', 6 down by C alone; C touches 10, 4 of them already moved by A/B'); bound if the rules
+  hold: <= 235.023 from v28's 235.3996 (label-free moves).
+  ~60% of the squared moves sit on one Rome row. Pre-commitment (on the initial ranking file): upload once, score logged
+  only, no implied label, no later upload changes these rows.
 """
 import argparse, json, sys
 from pathlib import Path

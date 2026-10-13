@@ -4,7 +4,8 @@ Team **understanding-accordion**, PRC Data Challenge 2026 (departure taxi-out ti
 
 Author: Alexander Beiser (TU Wien), team understanding-accordion.
 
-This file covers all 29 files we uploaded to the public leaderboard, from v1 (2026-09-21) to v29 (2026-10-06). For each
+This file covers all 29 files we uploaded to the public leaderboard, from v1 (2026-09-21) to v29 (2026-10-06), and the
+two uploads of the final-phase file. §1.1 is the master upload table that the other documents refer to. For each
 upload it gives the change, the script that built it, the number of rows that moved, what our 2025 validation predicted
 beforehand, whether the change passed the decision rule written for it, and what the leaderboard returned. After the upload
 table come the calibration of offline estimates against live deltas, a ledger of what each part of the final model was
@@ -24,14 +25,16 @@ Related documents: the model is described in [MODEL.md](MODEL.md), the validatio
   copied from our dated internal experiment log, which is not published.
 - **Rows changed** counts the departures whose integer prediction differs from the parent file. It is computed from our own
   submission files and is label-free.
-- **2026 figures.** Apart from the live scores, no 2026 figure here is derived from scored labels; the two figures that
-  use a live score are the v28 and v29 bounds, which apply label-free row moves to the parent's live score. Every
+- **2026 figures.** Apart from the live scores, no 2026 figure here is derived from scored labels; the figures that
+  use a live score are the v28 and v29 bounds (and the candidate prices of the 10-06 structure search), which apply
+  label-free row moves to the parent's live score. Every
   other 2026 number is computed from our own files and the input columns of the ranking file, and is marked *label-free*.
 
 ## At a glance
 
 - **Best and last file on the initial ranking:** v29 at **234.8988**, rank 21 of 232 on 2026-10-06 (23 on 2026-10-09).
-  It is built by `python assemble.py --arm-u UT --lobt-window --join-complement --out v29`.
+  It is built by `python assemble.py --arm-u UT --lobt-window --join-complement --out v29`. As a taxi-out model, v27
+  scores 243.1478; v28 and v29 add post-processing for artefacts of the dataset's join, worth 8.25 s together.
 - **Uploads:** 29 over 10 upload days, never more than the limit of 5 per UTC day.
 - **Progress:** from v3, the first mixture model (352.2657), to v29 the score fell by 117.37 s. Five steps carry 70% of
   that:
@@ -49,8 +52,10 @@ Related documents: the model is described in [MODEL.md](MODEL.md), the validatio
   still in v29. v1–v5 predate written rules. All of this is set out in [§3](#3-use-of-the-public-leaderboard).
 - **v28** adds one deterministic constraint, the LOBT ±3,606 s window. The idea was adopted from public repositories, and
   in 2026 it moved 63 rows (label-free).
-- **v29** adds three label-free rules for departures without an LOBT (join complement A, B′ and a LEBL/LEMD cap C),
-  found post hoc on 2025 by our own structure search. In 2026 they moved 36 other rows (label-free); live −0.50.
+- **v29** adds three label-free rules for departures without an LOBT (join complement A, B′ and a LEBL/LEMD cap C).
+  They came from a structure search on 2025 and on label-free 2026 rows; candidates were priced against v28's live
+  score; 3 shipped ([`experiments/hunt_1006/`](../experiments/hunt_1006/README.md)). In 2026 they moved 36 other rows
+  (label-free); live −0.50.
 - **Final phase:** one blind file on January, February, June and July 2026, the v29 design rebuilt end to end;
   uploaded 2026-10-12, after an ADS-B extraction fix on four of its days (§8).
 
@@ -84,6 +89,56 @@ Gate history:
 - **From v19 on:** R1–R5.
 
 ## 1. Upload record
+
+### 1.1 Master upload table
+
+Every file we uploaded, classified. *Rows changed* counts departures whose integer prediction differs from the parent
+file (the previous upload; for v26 it is v24), computed from our own files *(label-free)*. *Changed rows lie in* names
+the smallest input-defined population that contains all changed rows (zone P = no `AOBT_3_flt` and take-off more than
+7,200 s after schedule). *Basis*: **rule** = passed a decision rule written before its run; **LB test** = model-level
+leaderboard test; **override** = uploaded after failing its rule; **post-hoc rule** = dataset-artefact rule found and
+measured before its header was written; **no rule** = predates written rules. *Series* marks variants of one change
+uploaded in sequence. Details per version are in §1.2 and §2; the leaderboard account is in §3.
+
+| v | date | change | rows changed | changed rows lie in | basis | series | live |
+|---:|---|---|---:|---|---|---|---:|
+| 1 | 09-21 | one regressor, target trimmed | – | all | LB test (pair) | | 543.6699 |
+| 2 | 09-21 | v1 untrimmed | 341,032 | all | LB test (pair) | | 507.5496 |
+| 3 | 09-21 | mixture | 341,181 | all | no rule | | 352.2657 |
+| 4 | 09-22 | bulk features | 341,422 | all | no rule | | 322.2460 |
+| 5 | 09-22 | LightGBM capacity | 337,749 | all | no rule | | 321.2771 |
+| 6 | 09-23 | zone-P tail specialist | 1,707 | **zone P** | rule | | 308.1903 |
+| 7 | 09-23 | zone-P per-flight features | 1,507 | **zone P** | LB test | | 304.3510 |
+| 8 | 09-23 | embedding network, weight 0.5 | 337,637 | all | rule | S1 | 297.8290 |
+| 9 | 09-23 | network weight 0.65 on A/B/C | 315,836 | routes A/B/C | rule | S1 | 297.3414 |
+| 10 | 09-24 | route-D corrector | 5,029 | **route D** | LB test | | 292.3393 |
+| 11 | 09-24 | residual feature stack | 332,482 | outside zone P | rule | | 289.6993 |
+| 12 | 09-24 | four-family blend | 328,698 | routes A/B/C | rule | | 286.9012 |
+| 13 | 09-24 | TabICL for Rome zone P | 180 | **Rome zone P** | rule | | 284.4106 |
+| 14 | 09-24 | W2 members; pooled TabICL | 333,810 | routes A/B/C and zone P | rule | | 276.8324 |
+| 15 | 09-25 | W2 on route D and zone-P bulk | 254,330 | all | rule | | 275.3106 |
+| 16 | 09-25 | W3 network | 331,608 | outside zone P | rule | | 274.6519 |
+| 17 | 09-26 | adsb.lol columns | 340,562 | outside zone P | rule | | 251.1243 |
+| 18 | 09-26 | corrector halved outside P | 3,455 | **route D outside zone P** | rule; tie-break by a live check | | 250.3448 |
+| 19 | 09-26 | seq as 8th member | 330,024 | outside zone P | rule | | 248.7469 |
+| 20 | 09-26 | seq in zone P's bulk branch | 1,704 | **zone P** | rule | | 245.7300 |
+| 21 | 09-27 | seq 15 epochs | 320,495 | all | rule | S2 | 245.4673 |
+| 22 | 09-27 | seq 20 epochs | 317,619 | all | rule | S2 | 245.1468 |
+| 23 | 09-27 | seq 30 epochs | 323,100 | all | rule | S2 | 244.6576 |
+| 24 | 09-28 | 27-fit seq pool | 320,164 | all | rule | S2 | 244.2213 |
+| 25 | 09-28 | Rome zone-P carrier rates | 180 | **Rome zone P** | override | | 245.2878 |
+| 26 | 10-02 | U (vs v24) | 319,221 | routes A/B/C | rule | S3 | 243.4219 |
+| 27 | 10-06 | U+T | 292,725 | routes A/B/C (+ 750 zone-P rows by ≤ 2 s of rounding) | rule | S3 | 243.1478 |
+| 28 | 10-06 | LOBT window | 63 | **63 rows with an LOBT** | post-hoc rule | | 235.3996 |
+| 29 | 10-06 | join complement, LEBL/LEMD cap | 36 | **36 rows: 30 route D (4 of them zone P), 6 LEMD rows with an LOBT** | post-hoc rule | | 234.8988 |
+| final | 10-10 08:35 UTC | safety net: v29 design on the final file (before the adsb.lol fix) | – | final file | frozen design | | no score |
+| final | 10-12 16:50 UTC | replacement: same, after the adsb.lol fix | 11,350 vs the safety net | 4 re-extracted days (+22 adjacent rows) | frozen design | | no score |
+
+Counts over v1-v29: basis **rule** 19, **LB test** 4 files (3 occasions), **override** 1, **post-hoc rule** 2,
+**no rule** 3. Nine uploads changed only a small population (bold above). Eight belong to three series: S1 (v8, v9,
+same day), S2 (v21-v24; v21-v23 on one day) and S3 (v26, v27, decided together before either was built).
+
+### 1.2 Detail: builder, offline expectation and gate
 
 Builders are paths relative to the repository root.
 
@@ -123,7 +178,7 @@ Builders are paths relative to the repository root.
 | 26 | 10-02 | "U": per-tercile NNLS weights on A/B/C, by disagreement across the 27 seq fits; built on v24 | `exp81_submit_v21.py --pool <9> --arm-u U` | 319,221 vs v24 | held-out −0.20 [−0.27, −0.15]; J+J −0.26 [−0.43, −0.15] | pass (gates frozen; design post hoc) | 243.4219 | −0.80 vs v24 |
 | 27 | 10-06 | "U+T": U + λ·(1 − p)·(10-epoch seq − its no-context twin) on A/B/C | `assemble.py --arm-u UT --out v27` | 292,725 | vs v24: held-out −0.59 [−0.77, −0.43], J+J −0.60 [−0.97, −0.35]; vs U: J+J −0.34 | pass | 243.1478 | −0.27 |
 | 28 | 10-06 | **63-row constraint:** LOBT ±3,606 s feasibility window | `assemble.py --arm-u UT --lobt-window --out v28` | 63 | v24 OOF (in-sample for the rule): held-out −0.55 [−0.95, −0.24], J+J −1.07 [−2.32, −0.31]; 2026 bound ≤ −5.99 if the 2025 join rule holds (label-free moves applied to v27's live score) | R1–R3 pass; R5 passes only vacuously; R4/X1/X2 not applicable; header written after the numbers | 235.3996 | −7.75 |
-| 29 | 10-06 | **36-row constraint:** join complement (A, B′) and LEBL/LEMD 3,606 s cap (C) for departures without an LOBT | `assemble.py --arm-u UT --lobt-window --join-complement --out v29` | 36 | 2025 OOF (in-sample for the rules): 140 rows change, 0 worse; held-out −0.62, J+J −0.43; 2026 bound ≤ −0.377 if the rules hold (label-free moves applied to v28's live score) | no pre-registered rule: found post hoc by a structure search; header and self-tests committed before the build (df0a5ff); uploaded on the team's decision | 234.8988 | −0.50 |
+| 29 | 10-06 | **36-row constraint:** join complement (A, B′) and LEBL/LEMD 3,606 s cap (C) for departures without an LOBT | `assemble.py --arm-u UT --lobt-window --join-complement --out v29` | 36 | 2025 OOF (in-sample for the rules): 140 rows change, 0 worse; held-out −0.62, J+J −0.43; 2026 bound ≤ −0.377 if the rules hold (label-free moves applied to v28's live score) | no pre-registered rule: from a structure search on 2025 and label-free 2026 rows, candidates priced against v28's live score; header and self-tests committed before the build (df0a5ff); uploaded on the author's decision | 234.8988 | −0.50 |
 
 ## 2. Notes on individual versions
 
@@ -263,7 +318,7 @@ was defined after that result, and its rule was written before the pool was eval
   - By airport: LFPG 24, EHAM 15, EGLL 5, LTFM 5, LEMD 4, EDDF 3, LIRF 2, EDDM 2, LEBL 2, LSZH 1.
   - If the rule holds in 2026, every moved row's error can only shrink, which bounds the score at ≤ 237.16 (−5.99 s).
     The bound applies these label-free moves to v27's live score.
-  - 96% of that guaranteed gain comes from one LIRF July departure. Our mixture had hedged that row between two hypotheses, both
+  - 96% of that bound comes from one LIRF July departure. Our mixture had hedged that row between two hypotheses, both
     of which lie outside its window. Without that row the bound is 242.92.
 - *How the gates apply:* on the 2025 OOF, R1–R3 pass; R5 passes only vacuously, because no row can get worse, and the
   gain is concentrated (about 79% in 10 rows); R4, X1 and X2 test fitted quantities and do not apply. We do not claim
@@ -282,9 +337,13 @@ was defined after that result, and its rule was written before the pool was eval
 - *Live:* −7.75 s, consistent with the bound. Per the pre-commitment, nothing further is inferred from it.
 
 **v29: the join complement and a source cap.**
-- *How it was found:* a search on 2025 for further structure of the same kind as the window (2026-10-06). It was not
-  pre-registered; three rules survived. The header in [`assemble.py`](../assemble.py), with self-tests that refuse to
-  build unless 2025 still shows each rule, was committed before the build (df0a5ff).
+- *How it was found:* a structure search on 2025 and on label-free 2026 rows for further structure of the window's
+  kind (2026-10-06); candidates were priced against v28's live score; 3 shipped. It was not pre-registered. The
+  local-midnight exclusion of B′ was added after the one 2026 row it removes had been inspected and priced under a
+  "normal" and a "day-shift" hypothesis. The dropped candidates (E1, B2, the DST window, twin rules T3/T4, Rome hedges)
+  and the scripts are in [`experiments/hunt_1006/`](../experiments/hunt_1006/README.md). The header in
+  [`assemble.py`](../assemble.py), with self-tests that refuse to build unless 2025 still shows each rule, was
+  committed before the build (df0a5ff).
 - *Rules* (departures without an LOBT; applied after the window):
   - **A (join complement, one-sided).** A route-D IFR departure whose own NM record appears on its destination's
     arrival row ("clean link") evidently failed the join, so |BLOCK − LOBT_arr| > 3,606 s. Where the lower side is
@@ -292,11 +351,13 @@ was defined after that result, and its rule was written before the pool was eval
     one-sided rows above the upper edge.
   - **B′ (two-sided, below side).** Where both sides are possible, the prediction is lowered to the lower edge.
     Rows stamped at the schedule and take-offs that cross local midnight relative to the schedule are excluded.
-    2025: 1,281 of 1,281 such rows below the lower edge. This is empirical, not a forced identity.
+    2025: 1,281 of 1,281 such rows below the lower edge (1,296 of 1,296 before the midnight exclusion). This is
+    empirical, not a forced identity.
   - **C (source cap).** LEBL and LEMD record no departure taxi above 3,606 s (2025 maximum 3,604 / 3,598 s; other
     airports exceed it): predictions there are capped at 3,606 s.
 - *Effect on 2025 (in-sample):* 140 OOF rows change, none for the worse; held-out −0.62, J+J −0.43.
-- *Effect on 2026 (label-free):* 36 rows move, 9 up by A, 21 down by B′ and 6 down by C. None of them is among the
+- *Effect on 2026 (label-free):* 36 rows move, 9 up by A, 21 down by B′ and 6 down by C alone (C touches 10 rows, 4
+  of which A or B′ already moved). None of them is among the
   63 window rows. The build also checks that the clean-link share and arrival NM coverage look like 2025. If the
   rules hold, the bound is ≤ 235.023 (−0.377 s against v28's live score); about 60% of the squared moves sit on one
   Rome row.
@@ -307,8 +368,13 @@ was defined after that result, and its rule was written before the pool was eval
 ## 3. Use of the public leaderboard
 
 The leaderboard scores every file on all 344,841 departures and keeps each team's best score; the limit is 5 uploads per
-UTC day. Every file we uploaded is in the table above. This section lists every way we used the leaderboard beyond
-recording our score.
+UTC day. Every file we uploaded is in the master table (§1.1). This section lists every way we used the leaderboard
+beyond recording our score.
+
+**How live scores were used.** Our own live scores decided v1/v2 (target trimming), v7 and v10 (leaderboard tests),
+the v18 tie-break and the dropping of v25; they set the v28 and v29 bounds, including the pricing of the 10-06
+structure-search candidates against v28's score; and, through the offline-to-live record and early deltas (CV
+protocol, `exp18`, `exp19`), they informed where we spent effort. No other modelling decision used them.
 
 **Model-level leaderboard tests: three occasions, four files.**
 
@@ -328,23 +394,30 @@ recording our score.
 - It lost 1.07 s live and was not carried forward.
 - The rule after it: do not override a failed rule for zone-P changes again.
 
-**Two variants of one design: v26 and v27.**
-- The team decided to upload both before either was built, and both passed frozen gates.
-- v28 builds on v27, which also has the stronger offline evidence.
+**Variants uploaded in sequence.** Under best-of scoring each of these series is also a selection on the scored set.
+- v8 → v9 (09-23, same day): network weight 0.5, then 0.65 on routes A/B/C, fitted on the 2025 screening months.
+  A day later `strategy/s18_nn_weight_live.py` fitted a live-optimal weight (0.68) through the v7-v9 scores; it was
+  not acted on.
+- v21, v22, v23 (09-27, same day): the seq member at 15, 20 and 30 epochs, each passing its own rule against the
+  previous file; then the 27-fit pool v24 (09-28).
+- v26, v27 (10-02, 10-06): two frozen arms of one evaluation, both uploaded by a decision taken before either was
+  built.
 
-**Single-airport changes: v13 and v25.**
-- Each changed only Rome's zone-P rows (180), by swapping the classifier for that population.
-- Neither edited individually chosen rows.
+**Uploads confined to a small population.** Nine uploads changed only a population defined from input columns
+(bold in §1.1, *label-free* counts): v6, v7 and v20 (zone P; 1,707, 1,507 and 1,704 rows), v10 (route D, 5,029), v18
+(route D outside zone P, 3,455), v13 and v25 (Rome's zone P, 180 each), v28 (63) and v29 (36). Each swapped one
+component or applied one rule to every row of its population; none edited individually chosen rows.
 
 **v28.**
 - The idea came from public repositories, and the rule header was written after its numbers were known.
 - R5 passes vacuously, and the concentration of the bound in one row is disclosed above.
-- It was uploaded once, under a pre-commitment that no later upload changes a projected row and that no implied label is
-  computed from its score.
+- It was uploaded once, under a pre-commitment (on the initial ranking file) that no later upload changes a projected
+  row and that no implied label is computed from its score.
 
 **v29.**
-- Its rules were found post hoc by our own structure search on 2025 and were not pre-registered; the team decided to
-  upload.
+- Its rules came from a structure search on 2025 and on label-free 2026 rows, with candidates priced against v28's
+  live score; they were not pre-registered; the author decided to upload. The B′ local-midnight exclusion was motivated
+  by one inspected 2026 row (§2).
 - It touches 36 rows chosen by rules over input columns (clean links, airport), not by id, and was uploaded once
   under the same pre-commitment as v28.
 
@@ -361,27 +434,50 @@ our own files.
 
 Only r03 fed an uploaded file (v18).
 
+**Leaderboard tooling.** `tools/leaderboard.py` pulls every team's public submission history from the competition
+API (`--wait` polls until our file is scored). `experiments/strategy/s08_threshold_drift.py` (cut-off drift),
+`s15_probability.py` (our probability of reaching the top-25% cut), `s16_outside_view.py` (how teams at our level
+improved), `research_0925/lb_analysis.py`, `drivers_0926/lb_snapshot.py`, `plan_1006/ff/ff_rankat.py` and
+`plan_1006/pattern.py` (other teams' upload timing) analyse that public data. They fed no model decision.
+
 **What was never done.**
 - No file was built to recover labels or to probe individual rows.
 - No uploaded file differs from its parent by an edit of rows selected by id. Every change is a model or a rule applied to
-  a population defined from inputs: route, zone P, airport, LOBT, arrival-side join links.
+  a population defined from inputs: route, zone P, airport, LOBT, arrival-side join links. One such rule, the B′
+  local-midnight exclusion of v29, was motivated by one inspected 2026 row (§2).
 - A class of Rome rows that may carry a one-day recording shift (identified label-free) was never submitted as a
   row-subset change.
 - Competitors' live results were not used as evidence.
 
-**Data not used in any submission.**
-- *What the data are:* EUROCONTROL publishes airport-level monthly taxi-out statistics, including averages and counts of
-  long taxi-outs, for January and July 2026. They summarise the evaluation labels.
-- *When we saw them:* they were identified and seen during scouting on 2026-09-21 and 2026-09-23. That was before the
-  team decided on 2026-09-23 never to use external summaries of the scored months' labels.
-- *What they could have been worth, measured on 2025 only:* a perfect airport-month level correction is worth −0.14 s on
-  J+J out-of-fold predictions (−0.28 s over 12 months).
-- *Policy change on 2026-10-09:* after the organisers confirmed twice that the file is allowed, the team decided it
-  could be used if measured and gated first. [`experiments/eurocontrol/ec01_value.py`](../experiments/eurocontrol/ec01_value.py)
-  applies the 2025 file to our 2025 OOF predictions as an additive per-airport-month shift. Every variant is worse on
-  the held-out months: raw +4.17 (1 of 12 months better), half +1.18 (4/12), gap-corrected +2.94 (0/12),
-  gap-corrected half +0.87 (2/12).
-- *Use:* none, in any submission. That script reads only the 2025 file.
+**EUROCONTROL's monthly taxi-out file: our exposure.** EUROCONTROL publishes each airport's monthly taxi-out figures
+(`taxi_out_additional_time_<year>.csv`, also shown on the ansperformance.eu dashboard). The 2026 file already covered
+January-July 2026, so it summarises the labels we are scored on. Dates are 2026, times UTC.
+- **09-21, first working session.** The session downloaded the file, checked its 2025 rows against the training data
+  (agreement within ±0.03 min) and noted each airport's January and July 2026 change in mean taxi-out as a possible
+  bias correction. This was never implemented.
+- **09-23, about 13:40.** An internal scouting report quoted Rome's January and July 2026 counts of taxi-outs over
+  120 min next to the summed tail probabilities of our v8 and proposed four uses. The team rejected all four that day
+  and set a rule: no summary of the scored months' labels as a feature, calibration target, count or upload gate.
+- **v13 (09-24) and the v25 override (09-28)** rested on 2025 evaluations: v13 on the leave-one-month-out test of
+  TabICL on Rome's 627 zone-P rows of 2025; v25 on `experiments/tail/t06_carrier_stamp.py` (2025; rule failed) and
+  `t07_carrier_checks.py` (descriptive checks on 2025 and label-free 2026). Neither our dev logs nor these scripts
+  refer to the published Rome counts. That does not rule out an indirect influence of the 09-23 report on where we
+  spent effort.
+- **09-26 to 09-28.** Research passes flagged the file again; it was not opened. We recorded an organiser answer on
+  the challenge Discord (2026-09-28) allowing the published monthly averages; the team kept its rule (re-confirmed
+  10-06).
+- **10-09.** After a second organiser confirmation (Discord, 2026-10-09), the author decided the file could be used if
+  measured and gated first. The 2025 and 2026 files were downloaded (09:40). `experiments/eurocontrol/ec01_value.py`
+  measured the 2025 file on our 2025 out-of-fold predictions only, as an additive per-airport-month shift: every variant
+  was worse on the held-out months (raw +4.17 s, 1 of 12 months better; half +1.18 s, 4/12; corrected for each
+  airport's published-minus-recorded gap +2.94 s, 0/12; gap-corrected half +0.87 s, 2/12). A label-free comparison of
+  v29's January/July airport-month means with the 2026 file's January/July figures was also looked at; it showed no
+  evidence of value and fed nothing. The file was not used.
+- **Never viewed:** the February and June 2026 figures (the downloaded 2026 files contain them). The final file and
+  its check script `experiments/final/f02_check_final.py` use none of the file. No tracked code reads the 2026 file.
+
+For scale, on 2025 only: a perfect airport-month level correction is worth −0.14 s on J+J out-of-fold predictions
+(−0.28 s over 12 months).
 
 ## 4. Offline against live calibration
 
@@ -547,32 +643,37 @@ These are ideas we built and measured that did not earn a place, with the number
 | seq switched off at Rome (pre-registered second arm) | Passes but worse: −1.70 against −2.11 held-out | Tie-break: ungated. |
 | Two-stage neighbour context (stage-1 predicted off-blocks as tokens) | Explains 0.10% of residual SSE; leaks through OOF predictions | Rejected. |
 
-### 6.5 Pre-registered bets after v28 (2026-10-06)
+### 6.5 Pre-registered experiments after v28 (called "bets" in the code)
+
+The two experiments of 2026-10-06 are below. The structure search that produced v29 was not pre-registered; its
+dropped candidates are in [`experiments/hunt_1006/`](../experiments/hunt_1006/README.md). The planning round that led
+to v28 is archived in [`experiments/plan_1006/`](../experiments/plan_1006/README.md). On 2026-10-13, 13 assembly-level
+candidates were tested on the 2025 out-of-fold predictions under a pre-registration with three disclosed post-hoc
+addenda; none was shipped ([`experiments/final_1013/`](../experiments/final_1013/README.md)).
 
 | Idea | Measurement | Verdict |
 |---|---|---|
 | Other exact join windows, like the LOBT one | 2025 rows with \|BLOCK − X\| > 3,606 s: LOBT 0, IOBT 58, EOBT_1 614, AOBT_3 1,769, SCHED 107,499 (route D: BLOCK − SCHED spans −86,402 to +151,090 s) | Only LOBT is exact; no other clock to clip by. v29 applies the LOBT join to departures without their own LOBT, through their arrival record (§2). |
 | Out-of-fold residual corrector on the v28 structure ([`experiments/tail/t08_oof_corrector.py`](../experiments/tail/t08_oof_corrector.py); LightGBM on clipped residuals of routes A/B/C, rule frozen in the header before the first run; the idea was raised by a participant on the challenge Discord) | Held-out −0.591 [−0.778, −0.419], J+J −0.715 [−1.140, −0.407], January −0.331 [−1.010, +0.071], July −1.101, 11/12 months; but the January ↔ July cross-fits were +0.305 and +0.386 (X2 fails) | Not uploaded and not re-tuned, per the frozen rule. |
+| Assembly-level levers on the v29 structure (2026-10-13; K1-K11, K3b, K3c; nested leave-one-month-out) | All fail except K3 (−0.008 s), K3b (−0.083 s [−0.140, −0.031], post hoc; +0.082 s without its 100 most-improved held-out rows, so it fails R5) and K3c (post hoc, J+J CI crosses 0) | None shipped. |
 
 ### 6.6 Not tried, on rule grounds
 
 - **Published scored-month airport statistics.** Excluded by team rule until 2026-10-09; then measured on 2025 and
   rejected (see §3).
-- **Few-row, high-variance bets.** For example, re-serving a handful of possible day-shift rows at Rome, or re-tuning
-  zone P by live score. These amount to probing the leaderboard.
-- **Uploading several variants of one change and keeping the best live score.** v26/v27 is the one case of two variants;
-  it was decided in advance with a choice rule (§2).
+- **Few-row, high-variance uploads.** For example, re-serving a handful of possible day-shift rows at Rome (priced in
+  the 10-06 structure search and killed), or re-tuning zone P by live score. These amount to probing the leaderboard.
+- **Uploading several variants of one change only to keep the best live score.** We did upload variants in sequence
+  (v8/v9, v21-v24, v26/v27; §3), each after passing its own rule; under best-of scoring that is still a selection on
+  the scored set.
 - **Pseudo-labels for 2026 rows from each flight's own ADS-B track.** That would mean training on the scored months.
 - **A second LOBT-window variant** (point estimate, median offset, truncated mean). Excluded by the v28 pre-commitment.
 - **Any model change for the final phase.** The organisers required the design to stay unchanged (§8).
 
 ## 7. How this was built
 
-**Decisions** were taken by the team: what to test, which data sources are acceptable, which rule a change must pass,
-and every upload.
-
-**Code and analysis** were written with AI assistance (Claude, by Anthropic); the commits carry `Co-Authored-By`
-trailers.
+See the README, "How this was built", for the authorship and AI workflow statement (one author, a multi-agent
+Claude Code workflow, approvals per upload, uploads executed by the agent through `prc/s3.py`).
 
 **Decision rules.**
 - *v1–v5:* these predate written rules.
@@ -580,8 +681,8 @@ trailers.
   - v7, v10 and v25, listed in §3;
   - the v18 tie-break;
   - the v28 window, whose header was written after its 2025 effect and 2026 bound were known;
-  - the v29 rules, found post hoc by a structure search and written up after their 2025 effect and 2026 bound were
-    known.
+  - the v29 rules, from a structure search on 2025 and on label-free 2026 rows (candidates priced against v28's live
+    score; 3 shipped), written up after their 2025 effect and 2026 bound were known.
 - *Commit order:* where a rule was committed on its own, commit order is consistent with it. Examples: 9d0dd0b came before
   the v26 build, 618ba86 before the v28 build and df0a5ff before the v29 build. Commit timestamps cannot prove this.
 - *Where the rules are:* from v14 on, most rules sit in the headers of the evaluation scripts
@@ -595,12 +696,15 @@ trailers.
 - **Task.** On 2026-10-09 the organisers announced one blind final submission on `final_ranking.parquet`: January,
   February, June and July 2026, 670,790 departures (152,719 / 144,158 / 181,791 / 192,122), with the January and July
   times re-dithered. The design must not change. Deadline for the file and for the repository: 2026-10-14 10:00 UTC.
-- **File.** `understanding-accordion_final.parquet`: the v29 design rebuilt end to end on the final file
-  (`PRC_RANKING=final`), with no model, weight or rule change. Build and checks are in
+- **File.** `understanding-accordion_final.parquet`: the v29 design re-run on the final file (`PRC_RANKING=final`),
+  with no model, weight or rule change: the frozen fit-and-predict jobs were re-run on the unchanged 2025 training data
+  with the same seeds. Build, checks and the table of differences from the v29 build are in
   [REPRODUCE.md §8](REPRODUCE.md#8-final-phase-rebuild-on-the-final-ranking-file).
 - **Checks** *(label-free)*: valid, 670,790 rows; on the 344,841 January/July departures shared with v29 the
   predictions differ by 16.11 s RMS (routes A/B/C 10.24 s, route D outside zone P 42.2 s, zone P 166.4 s; 0.25% of
-  rows by more than 60 s). The join complement moved 52 rows in the final file.
+  rows by more than 60 s). This difference is not fully decomposed; the known contributors are listed in REPRODUCE §8.
+  The join complement moved 52 rows in the final file.
 - **ADS-B fix.** Four days re-extracted after a silent short read; 11,350 predictions changed, 11,328 of them on those days
   ([VALIDATION.md](VALIDATION.md) §8).
-- **Status.** Uploaded 2026-10-12 16:50 UTC, replacing a safety-net upload of the pre-fix build made on 2026-10-10; read back byte-identical. The scorer accepted all 670,790 departures and returns no score.
+- **Status.** Two uploads, both in §1.1: a safety net of the pre-fix build (2026-10-10 08:35 UTC) and its replacement
+  (2026-10-12 16:50 UTC), read back byte-identical. The scorer accepted all 670,790 departures and returns no score.
